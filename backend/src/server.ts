@@ -16,6 +16,7 @@ import pipelineRoutes from './routes/pipelineRoutes';
 import executionRoutes from './routes/executionRoutes';
 import testExecutionRoutes from './routes/testExecutionRoutes';
 import creRoutes from './routes/creRoutes';
+import copilotRoutes from './routes/copilotRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { verifyEmailConnection } from './services/email.service';
 import { checkRedisConnection } from './queues/config';
@@ -47,6 +48,7 @@ app.use('/api/pipelines', pipelineRoutes);
 app.use('/api/executions', executionRoutes);
 app.use('/api/executions', testExecutionRoutes); // Test execution routes
 app.use('/api/cre', creRoutes);
+app.use('/api/copilot', copilotRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

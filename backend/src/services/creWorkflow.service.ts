@@ -65,10 +65,16 @@ class CREWorkflowService {
     const config: Record<string, any> = {};
 
     // Extract schedule from cron trigger
+    const triggerTypes = ['cron-trigger', 'http-trigger', 'evm-log-trigger'];
     const cronNode = nodes.find((n: any) => n.type === 'cron-trigger');
+    const hasAnyTrigger = nodes.some((n: any) => triggerTypes.includes(n.type));
+
     if (cronNode) {
       const cronConfig = cronNode.data?.fullConfig?.component || cronNode.data?.config || {};
       config.schedule = cronConfig.cronExpression || '0 */5 * * * *';
+    } else if (!hasAnyTrigger) {
+      // Default to cron trigger — provide a default schedule
+      config.schedule = '0 */5 * * * *';
     }
 
     // Extract API URL from http-fetch nodes

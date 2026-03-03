@@ -189,9 +189,12 @@ main()
     // Check for chain config nodes
     const hasChainConfig = nodes.some(n => ['chain-selector', 'rpc-endpoint'].includes(n.type));
     const hasContract = nodes.some(n => ['evm-read', 'evm-write', 'ireceiver-contract', 'price-feed-consumer'].includes(n.type));
+    const triggerTypes = ['cron-trigger', 'http-trigger', 'evm-log-trigger'];
     const hasCron = nodes.some(n => n.type === 'cron-trigger');
+    const hasAnyTrigger = nodes.some(n => triggerTypes.includes(n.type));
+    const needsSchedule = hasCron || !hasAnyTrigger;
 
-    if (hasCron) {
+    if (needsSchedule) {
       fields.push('  schedule: z.string()');
     }
 

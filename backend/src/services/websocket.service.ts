@@ -76,6 +76,19 @@ class WebSocketService {
   }
 
   /**
+   * Emit CRE authentication completion event
+   */
+  emitCREAuthComplete(success: boolean, email?: string): void {
+    if (!this.io) return;
+    this.io.emit('cre:auth:complete', { success, email });
+  }
+
+  emitCRECodeNeeded(): void {
+    if (!this.io) return;
+    this.io.emit('cre:code:needed');
+  }
+
+  /**
    * Get the Socket.io server instance
    */
   getIO(): SocketIOServer | null {

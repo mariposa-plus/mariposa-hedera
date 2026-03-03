@@ -1,6 +1,8 @@
 import { spawn } from 'child_process';
 import CREProject from '../models/CREProject';
 import { wsService } from './websocket.service';
+import { creAuth } from './creAuth.service';
+import { creProjectManager } from './creProjectManager.service';
 
 const CRE_CLI_PATH = process.env.CRE_CLI_PATH || 'cre';
 const SIMULATION_TIMEOUT = 60000; // 60 seconds
@@ -10,8 +12,17 @@ class CRESimulatorService {
    * Run CRE workflow simulation and stream logs via WebSocket
    */
   async simulate(projectId: string, workflowName: string): Promise<void> {
+    // Check CRE authentication before running simulation
+    const authStatus = await creAuth.checkStatus();
+    if (!authStatus.authenticated) {
+      throw new Error('CRE authentication required. Please login first.');
+    }
+
     const project = await CREProject.findById(projectId);
     if (!project) throw new Error('CRE project not found');
+
+    // Ensure project scaffolding files exist (self-heal legacy projects)
+    await creProjectManager.ensureProjectFiles(projectId);
 
     project.status = 'simulating';
     project.simulationLogs = [];
@@ -22,7 +33,7 @@ class CRESimulatorService {
     return new Promise<void>((resolve, reject) => {
       const child = spawn(
         CRE_CLI_PATH,
-        ['workflow', 'simulate', workflowName, '--trigger-index', '0', '--target', 'staging-settings'],
+        ['workflow', 'simulate', workflowName, '--trigger-index', '0', '--target', 'staging-settings', '--non-interactive'],
         {
           cwd: project.workspacePath,
           env: {

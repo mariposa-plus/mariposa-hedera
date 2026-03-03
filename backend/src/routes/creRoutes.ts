@@ -17,12 +17,30 @@ import {
   simulateWorkflow,
   getSimulationLogs,
   simulateByPipeline,
+  startCRELogin,
+  startCREHeadlessLogin,
+  submitVerificationCode,
+  getCREAuthStatus,
+  relayCRECallback,
+  logoutCRE,
+  handleOAuthRedirect,
 } from '../controllers/creController';
 
 const router = Router();
 
-// All CRE routes require authentication
+// Unauthenticated: OAuth provider redirects here (browser GET, no JWT)
+router.get('/auth/oauth-redirect', handleOAuthRedirect);
+
+// All remaining CRE routes require authentication
 router.use(protect);
+
+// CRE CLI Authentication
+router.post('/auth/login', startCRELogin);
+router.post('/auth/login-headless', startCREHeadlessLogin);
+router.post('/auth/submit-code', submitVerificationCode);
+router.get('/auth/status', getCREAuthStatus);
+router.post('/auth/callback', relayCRECallback);
+router.post('/auth/logout', logoutCRE);
 
 // Projects
 router.post('/projects', createProject);

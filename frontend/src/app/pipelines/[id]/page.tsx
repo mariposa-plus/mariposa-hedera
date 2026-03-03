@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import ReactFlow, {
   Background,
   Controls,
@@ -27,7 +27,7 @@ import { GenericConfigForm } from '@/components/modals/config-forms/GenericConfi
 import { EdgeConditionModal } from '@/components/modals/EdgeConditionModal';
 import { TestExecutionModal } from '@/components/modals/TestExecutionModal';
 import { ConditionalEdge } from '@/components/edges/ConditionalEdge';
-import { Save, ArrowLeft, Play, Beaker, Code2, Terminal } from 'lucide-react';
+import { Save, ArrowLeft, Play, Beaker, Code2, Terminal, Sparkles } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { NodeConfiguration, EdgeCondition } from '@/types';
 import { getComponentById } from '@/registry';
@@ -36,6 +36,8 @@ import { PipelineStatusBadge } from '@/components/pipeline/PipelineStatusBadge';
 import { PipelineActivateButton } from '@/components/pipeline/PipelineActivateButton';
 import { WorkflowCodePanel } from '@/components/panels/WorkflowCodePanel';
 import { SimulationPanel } from '@/components/panels/SimulationPanel';
+import { CopilotPanel } from '@/components/panels/CopilotPanel';
+import { CRELoginModal } from '@/components/modals/CRELoginModal';
 import { useCREStore } from '@/store/creStore';
 import { useSimulationLogs } from '@/hooks/useSimulationLogs';
 
@@ -78,7 +80,8 @@ const transformEdgesForSave = (reactFlowEdges: Edge[]) => {
 function PipelineBuilderContent() {
   const params = useParams();
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const searchParams = useSearchParams();
+  const { isAuthenticated, hasHydrated } = useAuthStore();
   const { currentPipeline, isLoading, error, fetchPipeline, savePipeline } = usePipelinesStore();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -108,7 +111,14 @@ function PipelineBuilderContent() {
   // CRE panels state
   const [isCodePanelOpen, setIsCodePanelOpen] = useState(false);
   const [isSimPanelOpen, setIsSimPanelOpen] = useState(false);
-  const { generatedCode, isGenerating, generateWarnings, generateWorkflow } = useCREStore();
+  const { generatedCode, isGenerating, generateWarnings, generateWorkflow, isCreAuthenticated, checkCreAuth } = useCREStore();
+
+  // CRE auth modal state
+  const [showCRELoginModal, setShowCRELoginModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'code' | 'simulate' | null>(null);
+
+  // Copilot panel state
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
   // Helper functions to get connected nodes
   const getUpstreamNodes = useCallback((node: Node): PipelineNode[] => {
@@ -145,8 +155,9 @@ function PipelineBuilderContent() {
     refreshInterval: 5000, // Refresh status every 5 seconds
   });
 
-  // Load pipeline data
+  // Load pipeline data and check CRE auth
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
@@ -154,7 +165,18 @@ function PipelineBuilderContent() {
     if (pipelineId) {
       fetchPipeline(pipelineId);
     }
-  }, [isAuthenticated, pipelineId, router]);
+    checkCreAuth();
+  }, [isAuthenticated, hasHydrated, pipelineId, router]);
+
+  // Handle ?cre_auth=success redirect from OAuth flow
+  useEffect(() => {
+    const creAuth = searchParams.get('cre_auth');
+    if (creAuth === 'success') {
+      checkCreAuth();
+      // Clean up the query param
+      window.history.replaceState({}, '', `/pipelines/${pipelineId}`);
+    }
+  }, [searchParams, pipelineId, checkCreAuth]);
 
   // Initialize nodes and edges from loaded pipeline
   useEffect(() => {
@@ -271,20 +293,159 @@ function PipelineBuilderContent() {
     }
   };
 
-  // CRE: Generate workflow code
+  // CRE: Generate workflow code (with auth gate)
   const handleGenerateCode = useCallback(async () => {
     if (!pipelineId) return;
+    if (!isCreAuthenticated) {
+      setPendingAction('code');
+      setShowCRELoginModal(true);
+      return;
+    }
     try {
       await generateWorkflow(pipelineId);
       setIsCodePanelOpen(true);
     } catch {}
-  }, [pipelineId, generateWorkflow]);
+  }, [pipelineId, generateWorkflow, isCreAuthenticated]);
 
-  // CRE: Run simulation
+  // CRE: Run simulation (with auth gate)
   const handleSimulate = useCallback(() => {
+    if (!isCreAuthenticated) {
+      setPendingAction('simulate');
+      setShowCRELoginModal(true);
+      return;
+    }
     setIsSimPanelOpen(true);
     startSimulation();
-  }, [startSimulation]);
+  }, [startSimulation, isCreAuthenticated]);
+
+  // Handle CRE auth success - run the pending action
+  const handleCREAuthSuccess = useCallback(async () => {
+    if (pendingAction === 'code' && pipelineId) {
+      try {
+        await generateWorkflow(pipelineId);
+        setIsCodePanelOpen(true);
+      } catch {}
+    } else if (pendingAction === 'simulate') {
+      setIsSimPanelOpen(true);
+      startSimulation();
+    }
+    setPendingAction(null);
+  }, [pendingAction, pipelineId, generateWorkflow, startSimulation]);
+
+  // Copilot: apply AI-proposed actions to the canvas
+  const applyCopilotActions = useCallback(
+    (actions: any[]) => {
+      // Map placeholder IDs (NEW_1, NEW_2…) to real generated IDs
+      const idMap: Record<string, string> = {};
+      let positionOffset = 0;
+
+      for (const action of actions) {
+        switch (action.action) {
+          case 'add_node': {
+            const nodeType = action.node_type || 'http-fetch';
+            const ts = Date.now() + positionOffset;
+            const nodeId = `${nodeType}-${ts}`;
+            positionOffset++;
+
+            // Track placeholder → real ID
+            if (action.placeholder_id) {
+              idMap[action.placeholder_id] = nodeId;
+            }
+
+            // Determine component type from registry
+            const componentDef = getComponentById(nodeType);
+            let componentType: 'cre' | 'solidity' | 'config' = 'cre';
+            if (componentDef) {
+              if (componentDef.category === 'solidity-contracts') componentType = 'solidity';
+              else if (componentDef.category === 'chain-config') componentType = 'config';
+            }
+
+            const pos = action.position || { x: 250 + positionOffset * 250, y: 200 };
+
+            const newNode: Node = {
+              id: nodeId,
+              type: nodeType,
+              position: pos,
+              data: {
+                id: nodeId,
+                type: nodeType,
+                componentType,
+                state: action.config ? 'configured' : 'draft',
+                label: action.label || componentDef?.name || nodeType,
+                ...(action.config ? { config: action.config } : {}),
+              },
+            };
+
+            setNodes((nds) => nds.concat(newNode));
+            break;
+          }
+
+          case 'update_node': {
+            if (!action.node_id) break;
+            setNodes((nds) =>
+              nds.map((node) => {
+                if (node.id === action.node_id) {
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      ...(action.label ? { label: action.label } : {}),
+                      ...(action.config
+                        ? {
+                            config: { ...node.data?.config, ...action.config },
+                            state: 'configured',
+                          }
+                        : {}),
+                    },
+                  };
+                }
+                return node;
+              }),
+            );
+            break;
+          }
+
+          case 'delete_node': {
+            if (!action.node_id) break;
+            const targetId = action.node_id;
+            setNodes((nds) => nds.filter((n) => n.id !== targetId));
+            setEdges((eds) =>
+              eds.filter((e) => e.source !== targetId && e.target !== targetId),
+            );
+            break;
+          }
+
+          case 'add_edge': {
+            const source = idMap[action.source] || action.source;
+            const target = idMap[action.target] || action.target;
+            const edgeId = `e-${source}-${target}`;
+
+            setEdges((eds) =>
+              addEdge(
+                {
+                  id: edgeId,
+                  source,
+                  target,
+                  data: {
+                    condition: action.condition || { type: 'immediate' },
+                  },
+                },
+                eds,
+              ),
+            );
+            break;
+          }
+
+          case 'delete_edge': {
+            if (!action.edge_id) break;
+            setEdges((eds) => eds.filter((e) => e.id !== action.edge_id));
+            break;
+          }
+        }
+      }
+    },
+    [setNodes, setEdges],
+  );
 
   // Mark as unsaved when nodes or edges change (but only after initial load)
   const isInitialMount = useRef(true);
@@ -549,7 +710,7 @@ function PipelineBuilderContent() {
     return { title: `Configure ${nodeType}`, icon: null, color: '#888' };
   };
 
-  if (!isAuthenticated) {
+  if (!hasHydrated || !isAuthenticated) {
     return null;
   }
 
@@ -728,6 +889,28 @@ function PipelineBuilderContent() {
               {isSimulating ? 'Simulating...' : 'Simulate'}
             </button>
 
+            {/* AI Copilot */}
+            <button
+              onClick={() => setIsCopilotOpen((v) => !v)}
+              style={{
+                padding: '8px 16px',
+                background: isCopilotOpen ? '#b45309' : '#f59e0b',
+                color: '#000',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '14px',
+                fontWeight: '600',
+              }}
+              title="AI Copilot"
+            >
+              <Sparkles size={16} />
+              {isCopilotOpen ? 'Close AI' : 'AI Copilot'}
+            </button>
+
             <div style={{ width: '1px', height: '32px', background: '#2a3f5f' }} />
 
             {/* Pipeline Activate/Deactivate Button */}
@@ -852,14 +1035,36 @@ function PipelineBuilderContent() {
         onSimulate={handleSimulate}
         onClear={clearLogs}
       />
+
+      {/* AI Copilot Panel */}
+      <CopilotPanel
+        isOpen={isCopilotOpen}
+        onClose={() => setIsCopilotOpen(false)}
+        nodes={nodes}
+        edges={edges}
+        onApplyActions={applyCopilotActions}
+      />
+
+      {/* CRE Login Modal */}
+      <CRELoginModal
+        isOpen={showCRELoginModal}
+        onClose={() => {
+          setShowCRELoginModal(false);
+          setPendingAction(null);
+        }}
+        onSuccess={handleCREAuthSuccess}
+        pipelineId={pipelineId}
+      />
     </div>
   );
 }
 
 export default function PipelineBuilderPage() {
   return (
-    <ReactFlowProvider>
-      <PipelineBuilderContent />
-    </ReactFlowProvider>
+    <Suspense fallback={<div style={{ background: '#0f1419', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>Loading...</div>}>
+      <ReactFlowProvider>
+        <PipelineBuilderContent />
+      </ReactFlowProvider>
+    </Suspense>
   );
 }

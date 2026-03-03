@@ -1,29 +1,54 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { usePipelinesStore } from '@/store/pipelineStore';
 import { useAuthStore } from '@/store/authStore';
+import { useCREStore } from '@/store/creStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { AppLayout } from '@/components/Layout/AppLayout';
+import { CRELoginModal } from '@/components/modals/CRELoginModal';
 
 export default function PipelinesPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PipelinesContent />
+    </Suspense>
+  );
+}
+
+function PipelinesContent() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
+  const searchParams = useSearchParams();
+  const { isAuthenticated, user, hasHydrated } = useAuthStore();
   const { pipelines, isLoading, error, fetchPipelines, createPipeline, deletePipeline, duplicatePipeline } = usePipelinesStore();
+
+  const { checkCreAuth } = useCREStore();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPipelineName, setNewPipelineName] = useState('');
   const [newPipelineDescription, setNewPipelineDescription] = useState('');
   const [createLoading, setCreateLoading] = useState(false);
+  const [showCRELoginModal, setShowCRELoginModal] = useState(false);
+  const [pendingPipelineId, setPendingPipelineId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
     fetchPipelines();
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, hasHydrated, router]);
+
+  // Handle ?cre_auth=success redirect from OAuth flow
+  useEffect(() => {
+    const creAuth = searchParams.get('cre_auth');
+    if (creAuth === 'success') {
+      checkCreAuth();
+      window.history.replaceState({}, '', '/pipelines');
+    }
+  }, [searchParams, checkCreAuth]);
 
   const handleCreatePipeline = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +58,15 @@ export default function PipelinesPage() {
       setShowCreateModal(false);
       setNewPipelineName('');
       setNewPipelineDescription('');
-      // Navigate to the pipeline builder
-      router.push(`/pipelines/${pipelineId}`);
+
+      // Check CRE auth before navigating
+      const isAuthed = await checkCreAuth();
+      if (isAuthed) {
+        router.push(`/pipelines/${pipelineId}`);
+      } else {
+        setPendingPipelineId(pipelineId);
+        setShowCRELoginModal(true);
+      }
     } catch (err) {
       // Error handled in store
     } finally {
@@ -59,7 +91,7 @@ export default function PipelinesPage() {
     }
   };
 
-  if (!isAuthenticated) {
+  if (!hasHydrated || !isAuthenticated) {
     return null;
   }
 
@@ -202,6 +234,24 @@ export default function PipelinesPage() {
           </div>
         </div>
       )}
+          {/* CRE Login Modal */}
+          <CRELoginModal
+            isOpen={showCRELoginModal}
+            onClose={() => {
+              setShowCRELoginModal(false);
+              // Navigate even without auth - they can auth later
+              if (pendingPipelineId) {
+                router.push(`/pipelines/${pendingPipelineId}`);
+                setPendingPipelineId(null);
+              }
+            }}
+            onSuccess={() => {
+              if (pendingPipelineId) {
+                router.push(`/pipelines/${pendingPipelineId}`);
+                setPendingPipelineId(null);
+              }
+            }}
+          />
         </div>
       </AppLayout>
     </ProtectedRoute>

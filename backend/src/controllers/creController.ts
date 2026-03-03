@@ -1,8 +1,13 @@
+import path from 'path';
 import { Request, Response } from 'express';
 import { creProjectManager } from '../services/creProjectManager.service';
+import { creAuth } from '../services/creAuth.service';
+import { wsService } from '../services/websocket.service';
 import Pipeline from '../models/Pipeline';
 import CREWorkflow from '../models/CREWorkflow';
 import CREContract from '../models/CREContract';
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://app.mariposa.plus';
 
 // --- Projects ---
 
@@ -268,6 +273,137 @@ export const getSimulationLogs = async (req: Request, res: Response) => {
   }
 };
 
+// --- CRE Authentication ---
+
+export const startCRELogin = async (req: Request, res: Response) => {
+  try {
+    const { pipelineId } = req.body;
+    const result = await creAuth.startLogin(pipelineId);
+    res.json({
+      success: true,
+      authUrl: result.modifiedAuthUrl,
+      originalAuthUrl: result.originalAuthUrl,
+      port: result.port,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const startCREHeadlessLogin = async (req: Request, res: Response) => {
+  const { email, password, pipelineId } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: 'Email and password are required' });
+  }
+
+  console.log(`[CRE Controller] Headless login request for email=${email}, pipelineId=${pipelineId || 'none'}`);
+
+  try {
+    const result = await creAuth.startHeadlessLogin(email, password, pipelineId);
+    if (result.success) {
+      wsService.emitCREAuthComplete(true);
+      const status = await creAuth.checkStatus();
+      console.log(`[CRE Controller] Headless login succeeded for email=${status.email}`);
+      return res.json({ success: true, email: status.email });
+    }
+    console.error(`[CRE Controller] Headless login failed: ${result.error}`);
+    return res.status(401).json({ success: false, message: result.error || 'Authentication failed' });
+  } catch (error: any) {
+    console.error(`[CRE Controller] Headless login exception: ${error.message}`, error.stack);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const submitVerificationCode = async (req: Request, res: Response) => {
+  const { code } = req.body;
+  if (!code) {
+    return res.status(400).json({ success: false, message: 'Verification code is required' });
+  }
+
+  const { submitVerificationCode: submitCode } = await import('../services/creHeadlessBrowser.service');
+  const accepted = submitCode(code);
+
+  if (accepted) {
+    res.json({ success: true, message: 'Code submitted to headless browser' });
+  } else {
+    res.status(409).json({ success: false, message: 'No headless login is waiting for a verification code' });
+  }
+};
+
+export const getCREAuthStatus = async (req: Request, res: Response) => {
+  try {
+    const status = await creAuth.checkStatus();
+    res.json({ success: true, ...status });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const relayCRECallback = async (req: Request, res: Response) => {
+  try {
+    const { callbackUrl } = req.body;
+    if (!callbackUrl) {
+      return res.status(400).json({ success: false, message: 'callbackUrl is required' });
+    }
+    const result = await creAuth.relayCallback(callbackUrl);
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const logoutCRE = async (req: Request, res: Response) => {
+  try {
+    await creAuth.logout();
+    res.json({ success: true, message: 'Logged out' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Handle OAuth redirect from the identity provider.
+ * This is an unauthenticated GET endpoint that receives ?code=X&state=Y,
+ * relays them to CRE CLI's localhost callback server, then redirects the
+ * user's browser back to the frontend.
+ */
+export const handleOAuthRedirect = async (req: Request, res: Response) => {
+  const { code, state } = req.query;
+
+  if (!code || !state) {
+    const errorMsg = encodeURIComponent('Missing code or state parameter from OAuth provider');
+    return res.redirect(`${FRONTEND_URL}/pipelines?cre_auth=error&message=${errorMsg}`);
+  }
+
+  try {
+    const session = creAuth.getActiveSession();
+    const result = await creAuth.relayOAuthCallback(code as string, state as string);
+
+    if (result.success) {
+      // Emit WebSocket event for instant detection in the modal
+      wsService.emitCREAuthComplete(true);
+
+      // Redirect to the pipeline page (or pipelines list if no pipelineId)
+      const redirectPath = session?.pipelineId
+        ? `/pipelines/${session.pipelineId}?cre_auth=success`
+        : '/pipelines?cre_auth=success';
+      return res.redirect(`${FRONTEND_URL}${redirectPath}`);
+    } else {
+      const errorMsg = encodeURIComponent(result.message || 'Failed to complete authentication');
+      const redirectPath = session?.pipelineId
+        ? `/pipelines/${session.pipelineId}?cre_auth=error&message=${errorMsg}`
+        : `/pipelines?cre_auth=error&message=${errorMsg}`;
+      return res.redirect(`${FRONTEND_URL}${redirectPath}`);
+    }
+  } catch (error: any) {
+    const errorMsg = encodeURIComponent(error.message || 'OAuth callback failed');
+    return res.redirect(`${FRONTEND_URL}/pipelines?cre_auth=error&message=${errorMsg}`);
+  }
+};
+
 // --- Pipeline-based simulation (resolves project from pipeline) ---
 
 export const simulateByPipeline = async (req: Request, res: Response) => {
@@ -281,8 +417,17 @@ export const simulateByPipeline = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Pipeline has no CRE project. Generate code first.' });
     }
 
-    const { workflowName } = req.body;
-    const wfName = workflowName || pipeline.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'default';
+    const workflow = await CREWorkflow.findOne({
+      pipelineId: req.params.pipelineId,
+      projectId: pipeline.creProjectId,
+    });
+    if (!workflow?.workflowPath) {
+      return res.status(400).json({
+        success: false,
+        message: 'No workflow found for this pipeline. Please generate code first.',
+      });
+    }
+    const wfName = path.basename(path.dirname(workflow.workflowPath));
 
     const { creSimulator } = await import('../services/creSimulator.service');
     creSimulator.simulate(pipeline.creProjectId.toString(), wfName).catch(console.error);
