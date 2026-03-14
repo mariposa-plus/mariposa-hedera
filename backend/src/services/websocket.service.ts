@@ -11,6 +11,7 @@ class WebSocketService {
     this.io = new SocketIOServer(httpServer, {
       cors: {
         origin: [
+          'https://hash.mariposa.plus',
           process.env.FRONTEND_URL || 'http://localhost:3000',
           'http://localhost:3000',
         ],
