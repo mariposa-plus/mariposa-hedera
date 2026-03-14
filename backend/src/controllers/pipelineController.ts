@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import Pipeline from '../models/Pipeline';
 import { AuthRequest } from '../middleware/auth';
-import { creProjectManager } from '../services/creProjectManager.service';
+import { hederaProjectManager } from '../services/hederaProjectManager.service';
 
 // @desc    Get all pipelines for user
 // @route   GET /api/pipelines
@@ -49,17 +49,17 @@ export const createPipeline = async (
       edges: [],
     });
 
-    // Auto-create CRE project for this pipeline
+    // Auto-create Hedera project for this pipeline
     try {
-      const creProject = await creProjectManager.createProject(
+      const hederaProject = await hederaProjectManager.createProject(
         req.user?._id?.toString() || '',
         pipelineName,
         description
       );
-      pipeline.creProjectId = creProject._id;
+      pipeline.hederaProjectId = hederaProject._id;
       await pipeline.save();
-    } catch (creError: any) {
-      console.warn('CRE project auto-creation failed:', creError.message);
+    } catch (hederaError: any) {
+      console.warn('Hedera project auto-creation failed:', hederaError.message);
     }
 
     res.status(201).json({
@@ -227,7 +227,7 @@ export const deletePipeline = async (
   res: Response
 ): Promise<void> => {
   try {
-    // Find pipeline first to get creProjectId for cascade delete
+    // Find pipeline first to get hederaProjectId for cascade delete
     const pipeline = await Pipeline.findOne({
       _id: req.params.id,
       userId: req.user?._id,
@@ -241,15 +241,15 @@ export const deletePipeline = async (
       return;
     }
 
-    // Cascade delete CRE project if it exists
-    if (pipeline.creProjectId) {
+    // Cascade delete Hedera project if it exists
+    if (pipeline.hederaProjectId) {
       try {
-        await creProjectManager.deleteProject(
-          pipeline.creProjectId.toString(),
+        await hederaProjectManager.deleteProject(
+          pipeline.hederaProjectId.toString(),
           req.user?._id?.toString() || ''
         );
-      } catch (creError: any) {
-        console.warn('CRE project cleanup failed:', creError.message);
+      } catch (hederaError: any) {
+        console.warn('Hedera project cleanup failed:', hederaError.message);
       }
     }
 
@@ -297,17 +297,17 @@ export const duplicatePipeline = async (
       edges: original.edges,
     });
 
-    // Auto-create CRE project for the duplicate
+    // Auto-create Hedera project for the duplicate
     try {
-      const creProject = await creProjectManager.createProject(
+      const hederaProject = await hederaProjectManager.createProject(
         req.user?._id?.toString() || '',
         dupName,
         original.description
       );
-      duplicate.creProjectId = creProject._id;
+      duplicate.hederaProjectId = hederaProject._id;
       await duplicate.save();
-    } catch (creError: any) {
-      console.warn('CRE project auto-creation for duplicate failed:', creError.message);
+    } catch (hederaError: any) {
+      console.warn('Hedera project auto-creation for duplicate failed:', hederaError.message);
     }
 
     res.status(201).json({

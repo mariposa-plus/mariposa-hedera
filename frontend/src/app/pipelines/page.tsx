@@ -1,13 +1,11 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { usePipelinesStore } from '@/store/pipelineStore';
 import { useAuthStore } from '@/store/authStore';
-import { useCREStore } from '@/store/creStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { AppLayout } from '@/components/Layout/AppLayout';
-import { CRELoginModal } from '@/components/modals/CRELoginModal';
 
 export default function PipelinesPage() {
   return (
@@ -19,18 +17,13 @@ export default function PipelinesPage() {
 
 function PipelinesContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { isAuthenticated, user, hasHydrated } = useAuthStore();
   const { pipelines, isLoading, error, fetchPipelines, createPipeline, deletePipeline, duplicatePipeline } = usePipelinesStore();
-
-  const { checkCreAuth } = useCREStore();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPipelineName, setNewPipelineName] = useState('');
   const [newPipelineDescription, setNewPipelineDescription] = useState('');
   const [createLoading, setCreateLoading] = useState(false);
-  const [showCRELoginModal, setShowCRELoginModal] = useState(false);
-  const [pendingPipelineId, setPendingPipelineId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -41,15 +34,6 @@ function PipelinesContent() {
     fetchPipelines();
   }, [isAuthenticated, hasHydrated, router]);
 
-  // Handle ?cre_auth=success redirect from OAuth flow
-  useEffect(() => {
-    const creAuth = searchParams.get('cre_auth');
-    if (creAuth === 'success') {
-      checkCreAuth();
-      window.history.replaceState({}, '', '/pipelines');
-    }
-  }, [searchParams, checkCreAuth]);
-
   const handleCreatePipeline = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateLoading(true);
@@ -58,15 +42,7 @@ function PipelinesContent() {
       setShowCreateModal(false);
       setNewPipelineName('');
       setNewPipelineDescription('');
-
-      // Check CRE auth before navigating
-      const isAuthed = await checkCreAuth();
-      if (isAuthed) {
-        router.push(`/pipelines/${pipelineId}`);
-      } else {
-        setPendingPipelineId(pipelineId);
-        setShowCRELoginModal(true);
-      }
+      router.push(`/pipelines/${pipelineId}`);
     } catch (err) {
       // Error handled in store
     } finally {
@@ -100,19 +76,19 @@ function PipelinesContent() {
       <AppLayout>
         <div style={{ padding: '40px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h1>My Pipelines</h1>
+        <h1>My Workflows</h1>
         <button className="btn" onClick={() => setShowCreateModal(true)}>
-          Create Pipeline
+          Create Workflow
         </button>
       </div>
 
       {error && <div className="error">{error}</div>}
 
       {isLoading ? (
-        <p>Loading pipelines...</p>
+        <p>Loading workflows...</p>
       ) : pipelines.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#666' }}>
-          <p>No pipelines yet. Create your first pipeline to get started!</p>
+          <p>No workflows yet. Create your first workflow to get started!</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
@@ -193,16 +169,16 @@ function PipelinesContent() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ marginBottom: '20px' }}>Create New Pipeline</h2>
+            <h2 style={{ marginBottom: '20px' }}>Create New Workflow</h2>
             <form onSubmit={handleCreatePipeline}>
               <div className="form-group">
-                <label htmlFor="name">Pipeline Name</label>
+                <label htmlFor="name">Workflow Name</label>
                 <input
                   type="text"
                   id="name"
                   value={newPipelineName}
                   onChange={(e) => setNewPipelineName(e.target.value)}
-                  placeholder="My Pipeline"
+                  placeholder="My Workflow"
                   required
                 />
               </div>
@@ -212,7 +188,7 @@ function PipelinesContent() {
                   id="description"
                   value={newPipelineDescription}
                   onChange={(e) => setNewPipelineDescription(e.target.value)}
-                  placeholder="What does this pipeline do?"
+                  placeholder="What does this workflow do?"
                   rows={3}
                   style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
                 />
@@ -234,24 +210,6 @@ function PipelinesContent() {
           </div>
         </div>
       )}
-          {/* CRE Login Modal */}
-          <CRELoginModal
-            isOpen={showCRELoginModal}
-            onClose={() => {
-              setShowCRELoginModal(false);
-              // Navigate even without auth - they can auth later
-              if (pendingPipelineId) {
-                router.push(`/pipelines/${pendingPipelineId}`);
-                setPendingPipelineId(null);
-              }
-            }}
-            onSuccess={() => {
-              if (pendingPipelineId) {
-                router.push(`/pipelines/${pendingPipelineId}`);
-                setPendingPipelineId(null);
-              }
-            }}
-          />
         </div>
       </AppLayout>
     </ProtectedRoute>

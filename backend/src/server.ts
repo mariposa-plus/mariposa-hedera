@@ -15,7 +15,7 @@ import itemRoutes from './routes/itemRoutes';
 import pipelineRoutes from './routes/pipelineRoutes';
 import executionRoutes from './routes/executionRoutes';
 import testExecutionRoutes from './routes/testExecutionRoutes';
-import creRoutes from './routes/creRoutes';
+import hederaRoutes from './routes/hederaRoutes';
 import copilotRoutes from './routes/copilotRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { verifyEmailConnection } from './services/email.service';
@@ -47,7 +47,7 @@ app.use('/api/items', itemRoutes);
 app.use('/api/pipelines', pipelineRoutes);
 app.use('/api/executions', executionRoutes);
 app.use('/api/executions', testExecutionRoutes); // Test execution routes
-app.use('/api/cre', creRoutes);
+app.use('/api/hedera', hederaRoutes);
 app.use('/api/copilot', copilotRoutes);
 
 // Health check route

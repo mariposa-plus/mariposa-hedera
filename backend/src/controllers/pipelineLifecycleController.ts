@@ -37,16 +37,17 @@ export const activatePipeline = async (req: AuthRequest, res: Response): Promise
     await pipeline.save();
 
     try {
-      // TODO: Register CRE trigger watchers (cron-trigger, http-trigger, evm-log-trigger)
+      // TODO: Register Hedera trigger watchers (cron-trigger, price-threshold, webhook-trigger, hcs-event-trigger)
       // For now, just mark as active
       const triggerNodes = pipeline.nodes.filter(
         (node) =>
           node.type === 'cron-trigger' ||
-          node.type === 'http-trigger' ||
-          node.type === 'evm-log-trigger'
+          node.type === 'price-threshold' ||
+          node.type === 'webhook-trigger' ||
+          node.type === 'hcs-event-trigger'
       );
 
-      console.log(`Found ${triggerNodes.length} CRE trigger node(s) for pipeline: ${pipelineId}`);
+      console.log(`Found ${triggerNodes.length} trigger node(s) for pipeline: ${pipelineId}`);
 
       // Mark as fully active
       pipeline.status = 'active';
@@ -110,7 +111,7 @@ export const deactivatePipeline = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
-    // TODO: Remove CRE trigger watchers for this pipeline
+    // TODO: Remove Hedera trigger watchers for this pipeline
 
     // Update pipeline status
     pipeline.isActive = false;

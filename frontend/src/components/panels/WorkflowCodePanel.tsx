@@ -59,7 +59,7 @@ export function WorkflowCodePanel({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Code2 size={18} style={{ color: '#7c3aed' }} />
           <span style={{ color: '#fff', fontWeight: '600', fontSize: '14px' }}>
-            Generated CRE Workflow
+            Generated Hedera Workflow
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -153,7 +153,7 @@ export function WorkflowCodePanel({
             color: '#555',
           }}>
             <Code2 size={48} />
-            <div>Click "Regenerate" to generate CRE workflow code</div>
+            <div>Click "Regenerate" to generate Hedera workflow code</div>
             <div style={{ fontSize: '12px' }}>
               The code will be generated from your canvas nodes and connections
             </div>
@@ -173,7 +173,7 @@ export function WorkflowCodePanel({
           color: '#888',
         }}>
           <span>{code.split('\n').length} lines</span>
-          <span>TypeScript (CRE SDK)</span>
+          <span>TypeScript (Hedera Agent Kit)</span>
         </div>
       )}
     </div>

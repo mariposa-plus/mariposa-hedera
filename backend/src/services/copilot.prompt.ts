@@ -1,7 +1,7 @@
 /**
  * Copilot System Prompt & Tools
  *
- * Defines the system prompt injected into every Together AI request,
+ * Defines the system prompt injected into every AI copilot request,
  * including the current canvas state and available action schema.
  */
 
@@ -24,39 +24,74 @@ export interface CopilotAction {
   edge_id?: string;
 }
 
-// ── Available CRE node types (matches frontend registry) ───────────
+// ── Available Hedera node types (matches frontend registry) ─────────
 
-const CRE_NODE_TYPES = [
+const HEDERA_NODE_TYPES = [
+  // Hedera Account
+  { id: 'create-account', category: 'hedera-account', description: 'Create a new Hedera account with initial balance, memo, and auto-association settings.' },
+  { id: 'transfer-hbar', category: 'hedera-account', description: 'Transfer HBAR between accounts. Config: fromAccountId, toAccountId, amount, memo.' },
+  { id: 'query-balance', category: 'hedera-account', description: 'Query HBAR and token balances for a Hedera account. Config: accountId.' },
+  { id: 'update-account', category: 'hedera-account', description: 'Update Hedera account properties like memo, auto-renew period, staking.' },
+
+  // Hedera Token (HTS)
+  { id: 'create-fungible-token', category: 'hedera-token', description: 'Create a new HTS fungible token. Config: name, symbol, decimals, initialSupply, treasury.' },
+  { id: 'mint-token', category: 'hedera-token', description: 'Mint additional supply of an existing HTS token. Config: tokenId, amount.' },
+  { id: 'transfer-token', category: 'hedera-token', description: 'Transfer HTS tokens between accounts. Config: tokenId, fromAccountId, toAccountId, amount.' },
+  { id: 'query-token-info', category: 'hedera-token', description: 'Query token metadata and supply info. Config: tokenId.' },
+  { id: 'associate-token', category: 'hedera-token', description: 'Associate a token with an account before receiving it. Config: accountId, tokenId.' },
+  { id: 'create-nft', category: 'hedera-token', description: 'Create a new HTS NFT collection. Config: name, symbol, maxSupply, treasury.' },
+  { id: 'mint-nft', category: 'hedera-token', description: 'Mint an NFT with metadata to an existing collection. Config: tokenId, metadata.' },
+  { id: 'approve-allowance', category: 'hedera-token', description: 'Approve token spending allowance for another account. Config: tokenId, spenderAccountId, amount.' },
+
+  // Hedera Consensus (HCS)
+  { id: 'create-topic', category: 'hedera-consensus', description: 'Create an HCS topic for pub/sub messaging. Config: memo, adminKey, submitKey.' },
+  { id: 'submit-message', category: 'hedera-consensus', description: 'Submit a message to an HCS topic. Config: topicId, message.' },
+  { id: 'query-messages', category: 'hedera-consensus', description: 'Query messages from an HCS topic by sequence range. Config: topicId, startSequence, limit.' },
+
+  // Hedera EVM
+  { id: 'deploy-erc20', category: 'hedera-evm', description: 'Deploy an ERC-20 token smart contract on Hedera EVM. Config: name, symbol, initialSupply, solidityVersion.' },
+  { id: 'deploy-erc721', category: 'hedera-evm', description: 'Deploy an ERC-721 NFT smart contract on Hedera EVM. Config: name, symbol, baseURI.' },
+  { id: 'call-contract', category: 'hedera-evm', description: 'Call a write function on a deployed smart contract. Config: contractId, functionName, parameters, gas.' },
+  { id: 'query-contract', category: 'hedera-evm', description: 'Call a read-only function on a smart contract. Config: contractId, functionName, parameters.' },
+
+  // Hedera Schedule
+  { id: 'schedule-transaction', category: 'hedera-schedule', description: 'Schedule a Hedera transaction for delayed or multi-sig execution. Config: transactionType, parameters, expirationTime.' },
+
+  // DeFi — SaucerSwap
+  { id: 'saucerswap-swap', category: 'defi-saucerswap', description: 'Execute a token swap on SaucerSwap DEX. Config: tokenInId, tokenOutId, amountIn, slippage.' },
+  { id: 'query-pool', category: 'defi-saucerswap', description: 'Query SaucerSwap liquidity pool info. Config: tokenAId, tokenBId.' },
+  { id: 'add-liquidity', category: 'defi-saucerswap', description: 'Add liquidity to a SaucerSwap pool. Config: tokenAId, tokenBId, amountA, amountB, slippage.' },
+  { id: 'remove-liquidity', category: 'defi-saucerswap', description: 'Remove liquidity from a SaucerSwap pool. Config: tokenAId, tokenBId, lpAmount, slippage.' },
+
+  // DeFi — Bonzo Finance
+  { id: 'bonzo-deposit', category: 'defi-bonzo', description: 'Deposit tokens into Bonzo Finance lending pool. Config: tokenId, amount.' },
+  { id: 'bonzo-withdraw', category: 'defi-bonzo', description: 'Withdraw tokens from Bonzo Finance lending pool. Config: tokenId, amount.' },
+  { id: 'bonzo-borrow', category: 'defi-bonzo', description: 'Borrow tokens from Bonzo Finance against collateral. Config: tokenId, amount.' },
+  { id: 'bonzo-repay', category: 'defi-bonzo', description: 'Repay a Bonzo Finance loan. Config: tokenId, amount.' },
+  { id: 'query-vault-position', category: 'defi-bonzo', description: 'Query current vault/lending position on Bonzo Finance. Config: accountId.' },
+
+  // AI / LLM
+  { id: 'llm-analyzer', category: 'ai', description: 'Analyze data with an LLM (Claude/GPT). Config: prompt, model, maxTokens. Outputs analysis text.' },
+  { id: 'risk-scorer', category: 'ai', description: 'Score transaction or portfolio risk using AI. Config: prompt, riskFactors, thresholds.' },
+  { id: 'sentiment-analyzer', category: 'ai', description: 'Analyze market sentiment from text data. Config: prompt, sources, model.' },
+
   // Triggers
-  { id: 'cron-trigger', category: 'cre-triggers', description: 'Schedule-based trigger (cron expression). Use as the starting point for time-based workflows.' },
-  { id: 'http-trigger', category: 'cre-triggers', description: 'HTTP webhook trigger. Use when the workflow should start from an external HTTP request.' },
-  { id: 'evm-log-trigger', category: 'cre-triggers', description: 'Listens for EVM log events on-chain. Use when workflow should react to smart contract events.' },
+  { id: 'cron-trigger', category: 'trigger', description: 'Schedule-based trigger using cron expressions. Use as workflow starting point. Config: schedule.' },
+  { id: 'price-threshold', category: 'trigger', description: 'Trigger when a token price crosses a threshold. Config: tokenId, threshold, direction (above/below).' },
+  { id: 'webhook-trigger', category: 'trigger', description: 'HTTP webhook trigger. Starts workflow from an external HTTP request. Config: path, method, secret.' },
+  { id: 'hcs-event-trigger', category: 'trigger', description: 'Trigger on new HCS topic messages. Config: topicId, filterExpression.' },
 
-  // Capabilities
-  { id: 'http-fetch', category: 'cre-capabilities', description: 'Fetch data from an HTTP/REST API endpoint. Config: url, method, headers, body.' },
-  { id: 'evm-read', category: 'cre-capabilities', description: 'Read data from an EVM smart contract (call a view/pure function). Config: contractAddress, method, abi, args, chainId.' },
-  { id: 'evm-write', category: 'cre-capabilities', description: 'Write/send a transaction to an EVM smart contract. Config: contractAddress, method, abi, args, chainId, value.' },
-  { id: 'node-mode', category: 'cre-capabilities', description: 'Execute custom JavaScript/TypeScript compute logic. Config: code (string of JS/TS).' },
-  { id: 'secrets-access', category: 'cre-capabilities', description: 'Access encrypted secrets stored in Chainlink DON. Config: secretKey.' },
+  // Logic & Control
+  { id: 'condition', category: 'logic', description: 'Conditional branching (if/else). Config: field, operator, value.' },
+  { id: 'data-transform', category: 'logic', description: 'Transform data using a JavaScript expression. Config: expression, outputFormat.' },
+  { id: 'loop', category: 'logic', description: 'Iterate over an array of items. Config: arrayField, maxIterations.' },
+  { id: 'delay', category: 'logic', description: 'Add a time delay between nodes. Config: delayMs.' },
 
-  // Logic
-  { id: 'consensus-aggregation', category: 'cre-logic', description: 'Aggregate results from multiple DON nodes using a consensus method. Config: method (median, mode, etc.).' },
-  { id: 'data-transform', category: 'cre-logic', description: 'Transform data between nodes using a JavaScript expression. Config: expression.' },
-  { id: 'condition', category: 'cre-logic', description: 'Conditional branching (if/else). Config: field, operator, value.' },
-  { id: 'abi-encode', category: 'cre-logic', description: 'ABI-encode data for EVM contract calls. Config: types, values.' },
-  { id: 'abi-decode', category: 'cre-logic', description: 'ABI-decode data from EVM contract responses. Config: types, data.' },
-
-  // Solidity Contracts
-  { id: 'ireceiver-contract', category: 'solidity-contracts', description: 'Standard IReceiver consumer contract that receives CRE workflow output on-chain.' },
-  { id: 'price-feed-consumer', category: 'solidity-contracts', description: 'Consumer contract for price feed data.' },
-  { id: 'custom-data-consumer', category: 'solidity-contracts', description: 'Consumer contract for custom data delivery.' },
-  { id: 'event-emitter', category: 'solidity-contracts', description: 'Contract that emits events when data is received.' },
-
-  // Chain Config
-  { id: 'chain-selector', category: 'chain-config', description: 'Select which blockchain network to target.' },
-  { id: 'contract-address', category: 'chain-config', description: 'Specify a deployed contract address.' },
-  { id: 'wallet-signer', category: 'chain-config', description: 'Specify wallet/signer for transactions.' },
-  { id: 'rpc-endpoint', category: 'chain-config', description: 'Configure custom RPC endpoint.' },
+  // Output & Alerts
+  { id: 'hcs-log', category: 'output', description: 'Log data to an HCS topic for immutable audit trail. Config: topicId, messageTemplate.' },
+  { id: 'telegram-alert', category: 'output', description: 'Send an alert to a Telegram channel. Config: botToken, chatId, messageTemplate.' },
+  { id: 'discord-alert', category: 'output', description: 'Send an alert to a Discord channel via webhook. Config: webhookUrl, messageTemplate.' },
+  { id: 'email-notification', category: 'output', description: 'Send an email notification. Config: to, subject, bodyTemplate.' },
 ];
 
 // ── System prompt builder ───────────────────────────────────────────
@@ -65,7 +100,7 @@ export function buildCopilotPrompt(
   nodes: any[],
   edges: any[],
 ): string {
-  const nodeList = CRE_NODE_TYPES.map(
+  const nodeList = HEDERA_NODE_TYPES.map(
     (n) => `  - "${n.id}" (${n.category}): ${n.description}`,
   ).join('\n');
 
@@ -93,11 +128,11 @@ export function buildCopilotPrompt(
           .join('\n')
       : '  (no connections)';
 
-  return `You are Mariposa Copilot, an AI assistant that helps users build Chainlink CRE (Compute Runtime Environment) workflows on a visual pipeline canvas.
+  return `You are Mariposa Copilot, an AI assistant that helps users build Hedera Agent Kit workflows on a visual pipeline canvas.
 
 ## Your Role
-- Help users design and build CRE workflows by adding, configuring, updating, and removing nodes and edges on the canvas.
-- Explain what each node does and suggest best practices.
+- Help users design and build Hedera workflows by adding, configuring, updating, and removing nodes and edges on the canvas.
+- Explain what each node does and suggest best practices for Hedera development.
 - When the user asks to build something, propose concrete actions to modify the canvas.
 
 ## Available Node Types
@@ -132,21 +167,21 @@ Each action is an object with an "action" field and relevant properties:
    { "action": "delete_edge", "edge_id": "<existing edge id>" }
 
 ### Example Response
-User: "Create a workflow that fetches ETH price every 5 minutes and writes it on-chain"
+User: "Create a workflow that creates a token and transfers it to another account every hour"
 
-I'll create a workflow with a cron trigger, HTTP fetch for price data, a data transform to extract the price, ABI encoding, and an EVM write to push it on-chain.
+I'll create a workflow with a cron trigger, token creation, token association, token transfer, and an HCS log for audit trail.
 
 \`\`\`actions
 [
-  { "action": "add_node", "node_type": "cron-trigger", "label": "Every 5 Min", "config": { "schedule": "*/5 * * * *" }, "position": { "x": 100, "y": 200 } },
-  { "action": "add_node", "node_type": "http-fetch", "label": "Fetch ETH Price", "config": { "url": "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd", "method": "GET" }, "position": { "x": 350, "y": 200 } },
-  { "action": "add_node", "node_type": "data-transform", "label": "Extract Price", "config": { "expression": "input.ethereum.usd" }, "position": { "x": 600, "y": 200 } },
-  { "action": "add_node", "node_type": "abi-encode", "label": "Encode Price", "config": { "types": ["uint256"], "values": ["price"] }, "position": { "x": 850, "y": 200 } },
-  { "action": "add_node", "node_type": "evm-write", "label": "Write On-Chain", "config": { "contractAddress": "0x...", "method": "updatePrice", "args": ["encodedData"] }, "position": { "x": 1100, "y": 200 } },
-  { "action": "add_edge", "source": "cron-trigger-<ts>", "target": "http-fetch-<ts>", "condition": { "type": "immediate" } },
-  { "action": "add_edge", "source": "http-fetch-<ts>", "target": "data-transform-<ts>", "condition": { "type": "immediate" } },
-  { "action": "add_edge", "source": "data-transform-<ts>", "target": "abi-encode-<ts>", "condition": { "type": "immediate" } },
-  { "action": "add_edge", "source": "abi-encode-<ts>", "target": "evm-write-<ts>", "condition": { "type": "immediate" } }
+  { "action": "add_node", "node_type": "cron-trigger", "label": "Every Hour", "config": { "schedule": "0 * * * *" }, "position": { "x": 100, "y": 200 } },
+  { "action": "add_node", "node_type": "create-fungible-token", "label": "Create Token", "config": { "name": "MyToken", "symbol": "MTK", "decimals": 8, "initialSupply": 1000000 }, "position": { "x": 350, "y": 200 } },
+  { "action": "add_node", "node_type": "associate-token", "label": "Associate Token", "config": { "accountId": "0.0.RECEIVER", "tokenId": "{{create-token.tokenId}}" }, "position": { "x": 600, "y": 200 } },
+  { "action": "add_node", "node_type": "transfer-token", "label": "Transfer Token", "config": { "tokenId": "{{create-token.tokenId}}", "toAccountId": "0.0.RECEIVER", "amount": 100 }, "position": { "x": 850, "y": 200 } },
+  { "action": "add_node", "node_type": "hcs-log", "label": "Log Transfer", "config": { "topicId": "0.0.LOG_TOPIC", "messageTemplate": "Transferred 100 tokens" }, "position": { "x": 1100, "y": 200 } },
+  { "action": "add_edge", "source": "NEW_1", "target": "NEW_2", "condition": { "type": "immediate" } },
+  { "action": "add_edge", "source": "NEW_2", "target": "NEW_3", "condition": { "type": "immediate" } },
+  { "action": "add_edge", "source": "NEW_3", "target": "NEW_4", "condition": { "type": "immediate" } },
+  { "action": "add_edge", "source": "NEW_4", "target": "NEW_5", "condition": { "type": "immediate" } }
 ]
 \`\`\`
 
@@ -158,5 +193,7 @@ I'll create a workflow with a cron trigger, HTTP fetch for price data, a data tr
 - For update_node, only include config fields that should change (they will be merged).
 - If the user asks a question that does NOT require canvas changes, just respond with text (no actions block).
 - Keep config suggestions practical with reasonable defaults. Encourage the user to customize further.
+- For Hedera-specific values like account IDs, use placeholder format "0.0.XXXXX" and encourage users to fill in real values.
+- Remember that trigger nodes (cron-trigger, price-threshold, webhook-trigger, hcs-event-trigger) should be the first node in a workflow.
 `;
 }

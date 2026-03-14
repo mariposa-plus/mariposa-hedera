@@ -23,12 +23,18 @@ interface NodeWrapperProps {
  */
 function getTypeBadge(componentType?: ComponentType): { label: string; color: string; bg: string } | null {
   switch (componentType) {
-    case 'cre':
-      return { label: 'CRE', color: '#34d399', bg: 'rgba(52, 211, 153, 0.2)' };
-    case 'solidity':
-      return { label: 'SOL', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.2)' };
-    case 'config':
-      return { label: 'CFG', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.2)' };
+    case 'hedera':
+      return { label: 'HBAR', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.2)' };
+    case 'defi':
+      return { label: 'DeFi', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.2)' };
+    case 'ai':
+      return { label: 'AI', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.2)' };
+    case 'logic':
+      return { label: 'Logic', color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' };
+    case 'trigger':
+      return { label: 'TRIG', color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.2)' };
+    case 'output':
+      return { label: 'OUT', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.2)' };
     default:
       return null;
   }

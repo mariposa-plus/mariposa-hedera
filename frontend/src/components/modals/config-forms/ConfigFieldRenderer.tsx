@@ -111,6 +111,80 @@ export function ConfigFieldRenderer({
           </select>
         );
 
+      case 'account-id':
+      case 'token-id':
+      case 'topic-id':
+        return (
+          <input
+            type="text"
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={fieldDef.placeholder || '0.0.XXXXX'}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              background: '#1a1a2e',
+              border: error ? '1px solid #ef4444' : isFocused ? '1px solid #3b82f6' : '1px solid #2a3f5f',
+              borderRadius: '6px',
+              color: '#fff',
+              fontSize: '14px',
+              outline: 'none',
+              transition: 'border-color 0.2s',
+              fontFamily: 'monospace',
+            }}
+          />
+        );
+
+      case 'address':
+        return (
+          <input
+            type="text"
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={fieldDef.placeholder || '0x...'}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              background: '#1a1a2e',
+              border: error ? '1px solid #ef4444' : isFocused ? '1px solid #3b82f6' : '1px solid #2a3f5f',
+              borderRadius: '6px',
+              color: '#fff',
+              fontSize: '14px',
+              outline: 'none',
+              transition: 'border-color 0.2s',
+              fontFamily: 'monospace',
+            }}
+          />
+        );
+
+      case 'cron':
+        return (
+          <input
+            type="text"
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={fieldDef.placeholder || '*/5 * * * *'}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              background: '#1a1a2e',
+              border: error ? '1px solid #ef4444' : isFocused ? '1px solid #3b82f6' : '1px solid #2a3f5f',
+              borderRadius: '6px',
+              color: '#fff',
+              fontSize: '14px',
+              outline: 'none',
+              transition: 'border-color 0.2s',
+              fontFamily: 'monospace',
+            }}
+          />
+        );
+
       case 'text':
         return (
           <input

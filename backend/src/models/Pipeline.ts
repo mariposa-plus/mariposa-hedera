@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 interface NodeData {
   id: string;
   type: string;
-  componentType?: 'cre' | 'solidity' | 'config';
+  componentType?: 'hedera' | 'defi' | 'ai' | 'logic' | 'trigger' | 'output';
   state?: 'draft' | 'configured' | 'ready' | 'error';
   entityId?: string;
   position: { x: number; y: number };
@@ -38,7 +38,7 @@ interface EdgeData {
 
 export interface IPipeline extends Document {
   userId: mongoose.Types.ObjectId;
-  creProjectId?: mongoose.Types.ObjectId;
+  hederaProjectId?: mongoose.Types.ObjectId;
   name: string;
   description?: string;
   nodes: NodeData[];
@@ -60,7 +60,7 @@ const NodeSchema = new Schema({
   type: { type: String, required: true },
   componentType: {
     type: String,
-    enum: ['cre', 'solidity', 'config'],
+    enum: ['hedera', 'defi', 'ai', 'logic', 'trigger', 'output'],
   },
   state: {
     type: String,
@@ -113,9 +113,9 @@ const pipelineSchema = new Schema<IPipeline>(
       ref: 'User',
       required: true,
     },
-    creProjectId: {
+    hederaProjectId: {
       type: Schema.Types.ObjectId,
-      ref: 'CREProject',
+      ref: 'HederaProject',
     },
     name: {
       type: String,

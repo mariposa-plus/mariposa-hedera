@@ -12,7 +12,7 @@ interface NodePaletteV2Props {
 
 export function NodePaletteV2({ onNodeDragStart }: NodePaletteV2Props) {
   const [expandedCategories, setExpandedCategories] = useState<Set<ComponentCategory>>(
-    new Set(['cre-triggers', 'cre-capabilities'])
+    new Set<ComponentCategory>(['trigger', 'hedera-account'])
   );
   const [searchQuery, setSearchQuery] = useState('');
 

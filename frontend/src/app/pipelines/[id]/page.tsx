@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import ReactFlow, {
   Background,
   Controls,
@@ -27,21 +27,18 @@ import { GenericConfigForm } from '@/components/modals/config-forms/GenericConfi
 import { EdgeConditionModal } from '@/components/modals/EdgeConditionModal';
 import { TestExecutionModal } from '@/components/modals/TestExecutionModal';
 import { ConditionalEdge } from '@/components/edges/ConditionalEdge';
-import { Save, ArrowLeft, Play, Beaker, Code2, Terminal, Sparkles } from 'lucide-react';
+import { Save, ArrowLeft, Play, Beaker, Code2, Sparkles } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
-import type { NodeConfiguration, EdgeCondition } from '@/types';
+import type { NodeConfiguration, EdgeCondition, ComponentType } from '@/types';
 import { getComponentById } from '@/registry';
 import { usePipelineLifecycle } from '@/hooks/usePipelineLifecycle';
 import { PipelineStatusBadge } from '@/components/pipeline/PipelineStatusBadge';
 import { PipelineActivateButton } from '@/components/pipeline/PipelineActivateButton';
 import { WorkflowCodePanel } from '@/components/panels/WorkflowCodePanel';
-import { SimulationPanel } from '@/components/panels/SimulationPanel';
 import { CopilotPanel } from '@/components/panels/CopilotPanel';
-import { CRELoginModal } from '@/components/modals/CRELoginModal';
-import { useCREStore } from '@/store/creStore';
-import { useSimulationLogs } from '@/hooks/useSimulationLogs';
+import { useHederaStore } from '@/store/hederaStore';
 
-// Use the generic node types mapping (supports all CRE components)
+// Use the generic node types mapping (supports all Hedera components)
 const nodeTypes = genericNodeTypes;
 
 const edgeTypes = {
@@ -80,7 +77,6 @@ const transformEdgesForSave = (reactFlowEdges: Edge[]) => {
 function PipelineBuilderContent() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { isAuthenticated, hasHydrated } = useAuthStore();
   const { currentPipeline, isLoading, error, fetchPipeline, savePipeline } = usePipelinesStore();
 
@@ -108,14 +104,9 @@ function PipelineBuilderContent() {
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
 
-  // CRE panels state
+  // Code panel state
   const [isCodePanelOpen, setIsCodePanelOpen] = useState(false);
-  const [isSimPanelOpen, setIsSimPanelOpen] = useState(false);
-  const { generatedCode, isGenerating, generateWarnings, generateWorkflow, isCreAuthenticated, checkCreAuth } = useCREStore();
-
-  // CRE auth modal state
-  const [showCRELoginModal, setShowCRELoginModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'code' | 'simulate' | null>(null);
+  const { generatedCode, isGenerating, generateWarnings, generateWorkflow } = useHederaStore();
 
   // Copilot panel state
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
@@ -138,7 +129,6 @@ function PipelineBuilderContent() {
   }, [nodes, edges]);
 
   const pipelineId = params.id as string;
-  const { logs: simLogs, isSimulating, error: simError, startSimulation, clearLogs } = useSimulationLogs(pipelineId);
 
   // Pipeline lifecycle management
   const token = useAuthStore.getState().token || '';
@@ -155,7 +145,7 @@ function PipelineBuilderContent() {
     refreshInterval: 5000, // Refresh status every 5 seconds
   });
 
-  // Load pipeline data and check CRE auth
+  // Load pipeline data
   useEffect(() => {
     if (!hasHydrated) return;
     if (!isAuthenticated) {
@@ -165,18 +155,7 @@ function PipelineBuilderContent() {
     if (pipelineId) {
       fetchPipeline(pipelineId);
     }
-    checkCreAuth();
   }, [isAuthenticated, hasHydrated, pipelineId, router]);
-
-  // Handle ?cre_auth=success redirect from OAuth flow
-  useEffect(() => {
-    const creAuth = searchParams.get('cre_auth');
-    if (creAuth === 'success') {
-      checkCreAuth();
-      // Clean up the query param
-      window.history.replaceState({}, '', `/pipelines/${pipelineId}`);
-    }
-  }, [searchParams, pipelineId, checkCreAuth]);
 
   // Initialize nodes and edges from loaded pipeline
   useEffect(() => {
@@ -293,44 +272,14 @@ function PipelineBuilderContent() {
     }
   };
 
-  // CRE: Generate workflow code (with auth gate)
+  // Generate workflow code
   const handleGenerateCode = useCallback(async () => {
     if (!pipelineId) return;
-    if (!isCreAuthenticated) {
-      setPendingAction('code');
-      setShowCRELoginModal(true);
-      return;
-    }
     try {
       await generateWorkflow(pipelineId);
       setIsCodePanelOpen(true);
     } catch {}
-  }, [pipelineId, generateWorkflow, isCreAuthenticated]);
-
-  // CRE: Run simulation (with auth gate)
-  const handleSimulate = useCallback(() => {
-    if (!isCreAuthenticated) {
-      setPendingAction('simulate');
-      setShowCRELoginModal(true);
-      return;
-    }
-    setIsSimPanelOpen(true);
-    startSimulation();
-  }, [startSimulation, isCreAuthenticated]);
-
-  // Handle CRE auth success - run the pending action
-  const handleCREAuthSuccess = useCallback(async () => {
-    if (pendingAction === 'code' && pipelineId) {
-      try {
-        await generateWorkflow(pipelineId);
-        setIsCodePanelOpen(true);
-      } catch {}
-    } else if (pendingAction === 'simulate') {
-      setIsSimPanelOpen(true);
-      startSimulation();
-    }
-    setPendingAction(null);
-  }, [pendingAction, pipelineId, generateWorkflow, startSimulation]);
+  }, [pipelineId, generateWorkflow]);
 
   // Copilot: apply AI-proposed actions to the canvas
   const applyCopilotActions = useCallback(
@@ -354,11 +303,7 @@ function PipelineBuilderContent() {
 
             // Determine component type from registry
             const componentDef = getComponentById(nodeType);
-            let componentType: 'cre' | 'solidity' | 'config' = 'cre';
-            if (componentDef) {
-              if (componentDef.category === 'solidity-contracts') componentType = 'solidity';
-              else if (componentDef.category === 'chain-config') componentType = 'config';
-            }
+            const componentType: ComponentType = componentDef?.type || 'hedera';
 
             const pos = action.position || { x: 250 + positionOffset * 250, y: 200 };
 
@@ -539,16 +484,7 @@ function PipelineBuilderContent() {
 
       // Determine component type from registry
       const componentDef = getComponentById(nodeType);
-      let componentType: 'cre' | 'solidity' | 'config' = 'cre';
-      if (componentDef) {
-        if (componentDef.category === 'solidity-contracts') {
-          componentType = 'solidity';
-        } else if (componentDef.category === 'chain-config') {
-          componentType = 'config';
-        } else {
-          componentType = 'cre';
-        }
-      }
+      const componentType: ComponentType = componentDef?.type || 'hedera';
 
       const newNode: Node = {
         id: `${nodeType}-${Date.now()}`,
@@ -843,7 +779,7 @@ function PipelineBuilderContent() {
             {/* Separator */}
             <div style={{ width: '1px', height: '32px', background: '#2a3f5f' }} />
 
-            {/* CRE: Generate Code */}
+            {/* Generate Code */}
             <button
               onClick={handleGenerateCode}
               disabled={isGenerating}
@@ -860,33 +796,10 @@ function PipelineBuilderContent() {
                 fontSize: '14px',
                 opacity: isGenerating ? 0.6 : 1,
               }}
-              title="Generate CRE workflow code"
+              title="Generate Hedera Agent Kit code"
             >
               <Code2 size={16} />
               {isGenerating ? 'Generating...' : 'Code'}
-            </button>
-
-            {/* CRE: Simulate */}
-            <button
-              onClick={handleSimulate}
-              disabled={isSimulating}
-              style={{
-                padding: '8px 16px',
-                background: '#7c3aed',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: isSimulating ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '14px',
-                opacity: isSimulating ? 0.6 : 1,
-              }}
-              title="Run CRE simulation"
-            >
-              <Terminal size={16} />
-              {isSimulating ? 'Simulating...' : 'Simulate'}
             </button>
 
             {/* AI Copilot */}
@@ -1015,7 +928,7 @@ function PipelineBuilderContent() {
         pipelineName={currentPipeline?.name || 'Pipeline'}
       />
 
-      {/* CRE Workflow Code Panel */}
+      {/* Workflow Code Panel */}
       <WorkflowCodePanel
         isOpen={isCodePanelOpen}
         onClose={() => setIsCodePanelOpen(false)}
@@ -1025,17 +938,6 @@ function PipelineBuilderContent() {
         warnings={generateWarnings}
       />
 
-      {/* CRE Simulation Panel */}
-      <SimulationPanel
-        isOpen={isSimPanelOpen}
-        onClose={() => setIsSimPanelOpen(false)}
-        logs={simLogs}
-        isSimulating={isSimulating}
-        error={simError}
-        onSimulate={handleSimulate}
-        onClear={clearLogs}
-      />
-
       {/* AI Copilot Panel */}
       <CopilotPanel
         isOpen={isCopilotOpen}
@@ -1043,17 +945,6 @@ function PipelineBuilderContent() {
         nodes={nodes}
         edges={edges}
         onApplyActions={applyCopilotActions}
-      />
-
-      {/* CRE Login Modal */}
-      <CRELoginModal
-        isOpen={showCRELoginModal}
-        onClose={() => {
-          setShowCRELoginModal(false);
-          setPendingAction(null);
-        }}
-        onSuccess={handleCREAuthSuccess}
-        pipelineId={pipelineId}
       />
     </div>
   );

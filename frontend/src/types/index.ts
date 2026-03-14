@@ -30,47 +30,64 @@ export interface Item {
 }
 
 // Component classification
-export type ComponentType = 'cre' | 'solidity' | 'config';
+export type ComponentType = 'hedera' | 'defi' | 'ai' | 'logic' | 'trigger' | 'output';
 
-// Component categories (CRE 5-category system)
+// Component categories (Hedera 12-category system)
 export type ComponentCategory =
-  | 'cre-triggers'
-  | 'cre-capabilities'
-  | 'cre-logic'
-  | 'solidity-contracts'
-  | 'chain-config';
+  | 'hedera-account'
+  | 'hedera-token'
+  | 'hedera-consensus'
+  | 'hedera-evm'
+  | 'hedera-schedule'
+  | 'defi-saucerswap'
+  | 'defi-bonzo'
+  | 'defi-stader'
+  | 'ai'
+  | 'trigger'
+  | 'logic'
+  | 'output';
 
 // Node states
 export type NodeState = 'draft' | 'configured' | 'ready' | 'error';
 
-// EVM chain identifiers
-export type EVMChain = 'ethereum-testnet-sepolia' | 'ethereum-mainnet' | 'arbitrum-testnet-sepolia' | 'arbitrum-mainnet' | 'base-testnet-sepolia' | 'base-mainnet' | 'avalanche-testnet-fuji' | 'avalanche-mainnet' | 'polygon-testnet-amoy' | 'polygon-mainnet' | 'optimism-testnet-sepolia' | 'optimism-mainnet';
+// Hedera network
+export type HederaNetwork = 'mainnet' | 'testnet';
 
-// CRE NodeType — all component types
+// Hedera NodeType — all component types
 export type NodeType =
-  // CRE Triggers
-  | 'cron-trigger' | 'http-trigger' | 'evm-log-trigger'
+  // Hedera Account
+  | 'create-account' | 'transfer-hbar' | 'query-balance' | 'update-account'
 
-  // CRE Capabilities
-  | 'http-fetch' | 'evm-read' | 'evm-write' | 'node-mode' | 'secrets-access'
+  // Hedera Token (HTS)
+  | 'create-fungible-token' | 'mint-token' | 'transfer-token' | 'query-token-info'
+  | 'associate-token' | 'create-nft' | 'mint-nft' | 'approve-allowance'
 
-  // CRE Logic
-  | 'consensus-aggregation' | 'data-transform' | 'condition' | 'abi-encode' | 'abi-decode'
+  // Hedera Consensus (HCS)
+  | 'create-topic' | 'submit-message' | 'query-messages'
 
-  // Solidity Contracts
-  | 'ireceiver-contract' | 'price-feed-consumer' | 'custom-data-consumer' | 'proof-of-reserve' | 'event-emitter'
+  // Hedera EVM
+  | 'deploy-erc20' | 'deploy-erc721' | 'call-contract' | 'query-contract'
 
-  // Chain Config
-  | 'chain-selector' | 'contract-address' | 'wallet-signer' | 'rpc-endpoint';
+  // Hedera Schedule
+  | 'schedule-transaction'
 
-// Solidity contract metadata
-export interface SolidityContractMeta {
-  abi?: any[];
-  bytecode?: string;
-  address?: string;
-  network?: string;
-  txHash?: string;
-}
+  // DeFi — SaucerSwap
+  | 'saucerswap-swap' | 'query-pool' | 'add-liquidity' | 'remove-liquidity'
+
+  // DeFi — Bonzo
+  | 'bonzo-deposit' | 'bonzo-withdraw' | 'bonzo-borrow' | 'bonzo-repay' | 'query-vault-position'
+
+  // AI / LLM
+  | 'llm-analyzer' | 'risk-scorer' | 'sentiment-analyzer'
+
+  // Triggers
+  | 'cron-trigger' | 'price-threshold' | 'webhook-trigger' | 'hcs-event-trigger'
+
+  // Logic
+  | 'condition' | 'data-transform' | 'loop' | 'delay'
+
+  // Output
+  | 'hcs-log' | 'telegram-alert' | 'discord-alert' | 'email-notification';
 
 export interface NodeData {
   id: string;
@@ -81,10 +98,7 @@ export interface NodeData {
   config?: Record<string, any>;
   fullConfig?: NodeConfiguration;
   isTrigger?: boolean;
-  // CRE-specific
-  creProjectId?: string;
-  solidityCode?: string;
-  contractMeta?: SolidityContractMeta;
+  hederaProjectId?: string;
 }
 
 export interface PipelineNode {
@@ -203,11 +217,17 @@ export interface ComponentSchema {
   // Input/Output definitions
   inputs?: ComponentIO[];
   outputs?: ComponentIO[];
+
+  // Hedera Agent Kit metadata
+  requiredPlugins?: string[];
+  requiredTools?: string[];
+  codeTemplate?: string;
+  requiredPackages?: string[];
 }
 
 // Field configuration for component config forms
 export interface ConfigField {
-  type: 'text' | 'password' | 'number' | 'select' | 'textarea' | 'toggle' | 'multi-select' | 'json' | 'code' | 'text-template' | 'prompt-template' | 'monaco-solidity' | 'chain-select';
+  type: 'text' | 'password' | 'number' | 'select' | 'textarea' | 'toggle' | 'multi-select' | 'json' | 'code' | 'text-template' | 'prompt-template' | 'monaco-solidity' | 'chain-select' | 'account-id' | 'token-id' | 'topic-id' | 'address' | 'cron';
   label: string;
   placeholder?: string;
   required?: boolean;
@@ -222,33 +242,33 @@ export interface ConfigField {
   helpText?: string;
   dependsOn?: string;
   acceptsInputVariables?: boolean;
+  showWhen?: { field: string; value: any };
 }
 
 // Component inputs/outputs
 export interface ComponentIO {
   id: string;
   label: string;
-  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'file' | 'any';
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'file' | 'any' | 'account' | 'token' | 'topic' | 'transaction' | 'address' | 'json';
   required?: boolean;
   description?: string;
 }
 
-// CRE Project types (for frontend store)
-export interface CREProject {
+// Hedera Project types (for frontend store)
+export interface HederaProject {
   _id: string;
   userId: string;
   name: string;
   description?: string;
   workspacePath: string;
-  status: 'created' | 'ready' | 'simulating' | 'error';
+  hederaNetwork: HederaNetwork;
+  status: 'created' | 'ready' | 'deploying' | 'error';
   errorMessage?: string;
-  lastSimulatedAt?: string;
-  simulationLogs?: string[];
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CREWorkflow {
+export interface HederaWorkflow {
   _id: string;
   projectId: string;
   userId: string;
@@ -257,24 +277,6 @@ export interface CREWorkflow {
   generatedAt?: string;
   status: 'pending' | 'generated' | 'valid' | 'invalid';
   validationErrors?: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CREContract {
-  _id: string;
-  projectId: string;
-  userId: string;
-  nodeId: string;
-  contractName: string;
-  soliditySource: string;
-  abi?: any[];
-  bytecode?: string;
-  deployedAddress?: string;
-  network?: string;
-  deployedTxHash?: string;
-  compilationErrors?: string[];
-  status: 'draft' | 'compiling' | 'compiled' | 'deploying' | 'deployed' | 'failed';
   createdAt: string;
   updatedAt: string;
 }

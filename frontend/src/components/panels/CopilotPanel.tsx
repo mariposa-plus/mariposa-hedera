@@ -245,10 +245,10 @@ export function CopilotPanel({
           >
             <Sparkles size={36} style={{ color: '#f59e0b', opacity: 0.5 }} />
             <div style={{ fontSize: '14px' }}>
-              Ask me to build CRE workflows!
+              Ask me to build Hedera workflows!
             </div>
             <div style={{ fontSize: '12px', color: '#444' }}>
-              e.g. &quot;Create a workflow that fetches ETH price every hour and writes it on-chain&quot;
+              e.g. &quot;Create a workflow that transfers HBAR and logs it to HCS&quot;
             </div>
           </div>
         )}

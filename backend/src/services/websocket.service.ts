@@ -76,16 +76,11 @@ class WebSocketService {
   }
 
   /**
-   * Emit CRE authentication completion event
+   * Emit Hedera authentication completion event
    */
-  emitCREAuthComplete(success: boolean, email?: string): void {
+  emitHederaAuthComplete(success: boolean, email?: string): void {
     if (!this.io) return;
-    this.io.emit('cre:auth:complete', { success, email });
-  }
-
-  emitCRECodeNeeded(): void {
-    if (!this.io) return;
-    this.io.emit('cre:code:needed');
+    this.io.emit('hedera:auth:complete', { success, email });
   }
 
   /**

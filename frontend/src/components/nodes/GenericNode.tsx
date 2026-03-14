@@ -9,7 +9,7 @@ import * as LucideIcons from 'lucide-react';
 /**
  * GenericNode
  * Universal node component that renders any component based on its schema.
- * Used for all CRE, Solidity, and Config node types.
+ * Used for all Hedera, DeFi, AI, Logic, Trigger, and Output node types.
  */
 export const GenericNode = memo(({ data }: NodeProps) => {
   const component = getComponentById(data.type);
@@ -22,7 +22,7 @@ export const GenericNode = memo(({ data }: NodeProps) => {
         icon={LucideIcons.HelpCircle}
         label={data.label || 'Unknown'}
         color="#888"
-        componentType="cre"
+        componentType="hedera"
       >
         <div style={{ fontSize: '12px', color: '#aaa' }}>Unknown component type: {data.type}</div>
       </NodeWrapper>

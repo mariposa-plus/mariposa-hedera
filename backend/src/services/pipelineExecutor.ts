@@ -2,6 +2,14 @@ import mongoose from 'mongoose';
 import Pipeline from '../models/Pipeline';
 import Execution, { IExecution } from '../models/Execution';
 import { queueDelayedNodeExecution, queueApprovalPendingExecution } from '../queues/executionQueue';
+import { hederaAccountHandler } from '../handlers/hederaAccount.handler';
+import { hederaTokenHandler } from '../handlers/hederaToken.handler';
+import { hederaConsensusHandler } from '../handlers/hederaConsensus.handler';
+import { hederaEvmHandler } from '../handlers/hederaEvm.handler';
+import { hederaDefiHandler } from '../handlers/hederaDefi.handler';
+import { aiHandler } from '../handlers/ai.handler';
+import { logicHandler } from '../handlers/logic.handler';
+import { outputHandler } from '../handlers/output.handler';
 
 export class PipelineExecutor {
   /**
@@ -157,7 +165,7 @@ export class PipelineExecutor {
 
   /**
    * Execute node-specific logic using appropriate handlers
-   * Dispatches to CRE node type stubs
+   * Dispatches to Hedera node type handlers
    */
   private async executeNodeLogic(
     node: any,
@@ -170,44 +178,78 @@ export class PipelineExecutor {
       console.log(`Inputs:`, JSON.stringify(inputs, null, 2));
     }
 
-    // Delegate to appropriate handler based on CRE node type
+    // Delegate to appropriate handler based on Hedera node type
     switch (node.type) {
-      // --- CRE Triggers ---
+      // --- Hedera Account Operations ---
+      case 'create-account':
+      case 'transfer-hbar':
+      case 'query-balance':
+      case 'update-account':
+        return hederaAccountHandler.execute(node, execution, inputs);
+
+      // --- Hedera Token Operations ---
+      case 'create-fungible-token':
+      case 'mint-token':
+      case 'transfer-token':
+      case 'query-token-info':
+      case 'associate-token':
+      case 'create-nft':
+      case 'mint-nft':
+      case 'approve-allowance':
+        return hederaTokenHandler.execute(node, execution, inputs);
+
+      // --- Hedera Consensus Service ---
+      case 'create-topic':
+      case 'submit-message':
+      case 'query-messages':
+        return hederaConsensusHandler.execute(node, execution, inputs);
+
+      // --- Hedera EVM / Smart Contracts ---
+      case 'deploy-erc20':
+      case 'deploy-erc721':
+      case 'call-contract':
+      case 'query-contract':
+      case 'schedule-transaction':
+        return hederaEvmHandler.execute(node, execution, inputs);
+
+      // --- Hedera DeFi (SaucerSwap & Bonzo) ---
+      case 'saucerswap-swap':
+      case 'query-pool':
+      case 'add-liquidity':
+      case 'remove-liquidity':
+      case 'bonzo-deposit':
+      case 'bonzo-withdraw':
+      case 'bonzo-borrow':
+      case 'bonzo-repay':
+      case 'query-vault-position':
+        return hederaDefiHandler.execute(node, execution, inputs);
+
+      // --- AI / Analysis ---
+      case 'llm-analyzer':
+      case 'risk-scorer':
+      case 'sentiment-analyzer':
+        return aiHandler.execute(node, execution, inputs);
+
+      // --- Triggers ---
       case 'cron-trigger':
-      case 'http-trigger':
-      case 'evm-log-trigger':
-        return { success: true, nodeType: node.type, message: 'CRE handler pending' };
+      case 'price-threshold':
+      case 'webhook-trigger':
+      case 'hcs-event-trigger':
+        return { success: true, nodeType: node.type, triggered: true, timestamp: new Date() };
 
-      // --- CRE Capabilities ---
-      case 'http-fetch':
-      case 'evm-read':
-      case 'evm-write':
-      case 'node-mode':
-      case 'secrets-access':
-        return { success: true, nodeType: node.type, message: 'CRE handler pending' };
-
-      // --- CRE Logic ---
-      case 'consensus-aggregation':
-      case 'data-transform':
+      // --- Logic / Flow Control ---
       case 'condition':
-      case 'abi-encode':
-      case 'abi-decode':
-        return { success: true, nodeType: node.type, message: 'CRE handler pending' };
+      case 'data-transform':
+      case 'loop':
+      case 'delay':
+        return logicHandler.execute(node, execution, inputs);
 
-      // --- CRE Contracts ---
-      case 'ireceiver-contract':
-      case 'price-feed-consumer':
-      case 'custom-data-consumer':
-      case 'proof-of-reserve':
-      case 'event-emitter':
-        return { success: true, nodeType: node.type, message: 'CRE handler pending' };
-
-      // --- CRE Config ---
-      case 'chain-selector':
-      case 'contract-address':
-      case 'wallet-signer':
-      case 'rpc-endpoint':
-        return { success: true, nodeType: node.type, message: 'CRE handler pending' };
+      // --- Output / Notifications ---
+      case 'hcs-log':
+      case 'telegram-alert':
+      case 'discord-alert':
+      case 'email-notification':
+        return outputHandler.execute(node, execution, inputs);
 
       default:
         console.warn(`Unknown node type: ${node.type}`);

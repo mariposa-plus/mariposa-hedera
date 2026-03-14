@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import {
   LayoutDashboard,
   Workflow,
+  Activity,
   Settings,
   LogOut,
   User,
@@ -23,9 +24,14 @@ export function Sidebar() {
       path: '/dashboard',
     },
     {
-      name: 'Pipelines',
+      name: 'Workflows',
       icon: Workflow,
       path: '/pipelines',
+    },
+    {
+      name: 'Executions',
+      icon: Activity,
+      path: '/executions',
     },
     {
       name: 'Settings',
@@ -42,6 +48,9 @@ export function Sidebar() {
   const isActive = (path: string) => {
     if (path === '/pipelines') {
       return pathname.startsWith('/pipelines');
+    }
+    if (path === '/executions') {
+      return pathname.startsWith('/executions');
     }
     return pathname === path;
   };

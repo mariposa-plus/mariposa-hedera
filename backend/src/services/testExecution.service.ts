@@ -162,55 +162,102 @@ export class TestExecutionService {
       // Gather inputs from upstream nodes based on input mappings
       const inputs = this.getNodeInputs(node, pipeline, executionContext);
 
-      // Execute based on CRE node type
+      // Execute based on Hedera node type
       let output: any;
 
       switch (node.type) {
-        // --- CRE Triggers ---
+        // --- Triggers ---
         case 'cron-trigger':
-        case 'http-trigger':
-        case 'evm-log-trigger':
-          output = { success: true, nodeType: node.type, message: 'CRE handler pending' };
-          await this.addLog(testExec, `  Simulated CRE trigger: ${node.type}`);
+        case 'price-threshold':
+        case 'webhook-trigger':
+        case 'hcs-event-trigger':
+          output = { success: true, nodeType: node.type, message: 'Trigger simulated' };
+          await this.addLog(testExec, `  Simulated trigger: ${node.type}`);
           break;
 
-        // --- CRE Capabilities ---
-        case 'http-fetch':
-        case 'evm-read':
-        case 'evm-write':
-        case 'node-mode':
-        case 'secrets-access':
-          output = { success: true, nodeType: node.type, message: 'CRE handler pending' };
-          await this.addLog(testExec, `  Simulated CRE capability: ${node.type}`);
+        // --- Hedera Account ---
+        case 'create-account':
+        case 'transfer-hbar':
+        case 'query-balance':
+        case 'update-account':
+          output = { success: true, nodeType: node.type, message: 'Hedera account operation simulated' };
+          await this.addLog(testExec, `  Simulated Hedera account: ${node.type}`);
           break;
 
-        // --- CRE Logic ---
-        case 'consensus-aggregation':
-        case 'data-transform':
+        // --- Hedera Token ---
+        case 'create-fungible-token':
+        case 'mint-token':
+        case 'transfer-token':
+        case 'query-token-info':
+        case 'associate-token':
+        case 'create-nft':
+        case 'mint-nft':
+        case 'approve-allowance':
+          output = { success: true, nodeType: node.type, message: 'HTS token operation simulated' };
+          await this.addLog(testExec, `  Simulated HTS token: ${node.type}`);
+          break;
+
+        // --- Hedera Consensus ---
+        case 'create-topic':
+        case 'submit-message':
+        case 'query-messages':
+          output = { success: true, nodeType: node.type, message: 'HCS operation simulated' };
+          await this.addLog(testExec, `  Simulated HCS: ${node.type}`);
+          break;
+
+        // --- Hedera EVM ---
+        case 'deploy-erc20':
+        case 'deploy-erc721':
+        case 'call-contract':
+        case 'query-contract':
+          output = { success: true, nodeType: node.type, message: 'EVM operation simulated' };
+          await this.addLog(testExec, `  Simulated EVM: ${node.type}`);
+          break;
+
+        // --- Hedera Schedule ---
+        case 'schedule-transaction':
+          output = { success: true, nodeType: node.type, message: 'Schedule operation simulated' };
+          await this.addLog(testExec, `  Simulated schedule: ${node.type}`);
+          break;
+
+        // --- DeFi ---
+        case 'saucerswap-swap':
+        case 'query-pool':
+        case 'add-liquidity':
+        case 'remove-liquidity':
+        case 'bonzo-deposit':
+        case 'bonzo-withdraw':
+        case 'bonzo-borrow':
+        case 'bonzo-repay':
+        case 'query-vault-position':
+          output = { success: true, nodeType: node.type, message: 'DeFi operation simulated' };
+          await this.addLog(testExec, `  Simulated DeFi: ${node.type}`);
+          break;
+
+        // --- AI ---
+        case 'llm-analyzer':
+        case 'risk-scorer':
+        case 'sentiment-analyzer':
+          output = { success: true, nodeType: node.type, message: 'AI analysis simulated' };
+          await this.addLog(testExec, `  Simulated AI: ${node.type}`);
+          break;
+
+        // --- Logic ---
         case 'condition':
-        case 'abi-encode':
-        case 'abi-decode':
-          output = { success: true, nodeType: node.type, message: 'CRE handler pending' };
-          await this.addLog(testExec, `  Simulated CRE logic: ${node.type}`);
+        case 'data-transform':
+        case 'loop':
+        case 'delay':
+          output = { success: true, nodeType: node.type, message: 'Logic operation simulated' };
+          await this.addLog(testExec, `  Simulated logic: ${node.type}`);
           break;
 
-        // --- CRE Contracts ---
-        case 'ireceiver-contract':
-        case 'price-feed-consumer':
-        case 'custom-data-consumer':
-        case 'proof-of-reserve':
-        case 'event-emitter':
-          output = { success: true, nodeType: node.type, message: 'CRE handler pending' };
-          await this.addLog(testExec, `  Simulated CRE contract: ${node.type}`);
-          break;
-
-        // --- CRE Config ---
-        case 'chain-selector':
-        case 'contract-address':
-        case 'wallet-signer':
-        case 'rpc-endpoint':
-          output = { success: true, nodeType: node.type, message: 'CRE handler pending' };
-          await this.addLog(testExec, `  Simulated CRE config: ${node.type}`);
+        // --- Output ---
+        case 'hcs-log':
+        case 'telegram-alert':
+        case 'discord-alert':
+        case 'email-notification':
+          output = { success: true, nodeType: node.type, message: 'Output operation simulated' };
+          await this.addLog(testExec, `  Simulated output: ${node.type}`);
           break;
 
         default:
