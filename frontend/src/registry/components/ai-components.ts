@@ -29,7 +29,7 @@ export const AI_COMPONENTS: Record<string, ComponentSchema> = {
           { value: 'openai.gpt-oss-120b-1:0', label: 'GPT-OSS 120B (best quality)' },
           { value: 'openai.gpt-oss-20b-1:0', label: 'GPT-OSS 20B (faster)' },
         ],
-        description: 'Runs on AWS Bedrock.',
+        helpText: 'Runs on AWS Bedrock.',
       },
       systemPrompt: {
         type: 'textarea',
@@ -104,7 +104,7 @@ export const AI_COMPONENTS: Record<string, ComponentSchema> = {
           { value: 'openai.gpt-oss-120b-1:0', label: 'GPT-OSS 120B (best quality)' },
           { value: 'openai.gpt-oss-20b-1:0', label: 'GPT-OSS 20B (faster)' },
         ],
-        description: 'Runs on AWS Bedrock.',
+        helpText: 'Runs on AWS Bedrock.',
       },
       riskThreshold: {
         type: 'number',
@@ -156,7 +156,7 @@ export const AI_COMPONENTS: Record<string, ComponentSchema> = {
           { value: 'openai.gpt-oss-120b-1:0', label: 'GPT-OSS 120B (best quality)' },
           { value: 'openai.gpt-oss-20b-1:0', label: 'GPT-OSS 20B (faster)' },
         ],
-        description: 'Runs on AWS Bedrock.',
+        helpText: 'Runs on AWS Bedrock.',
       },
       sources: {
         type: 'multi-select',
