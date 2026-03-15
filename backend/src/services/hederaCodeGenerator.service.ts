@@ -60,9 +60,9 @@ const NODE_PLUGIN_MAP: Record<string, string[]> = {
 
 // Package mapping: node type -> required npm packages
 const NODE_PACKAGE_MAP: Record<string, string[]> = {
-  'llm-analyzer': ['@anthropic-ai/sdk'],
-  'risk-scorer': ['@anthropic-ai/sdk'],
-  'sentiment-analyzer': ['@anthropic-ai/sdk'],
+  'llm-analyzer': ['axios'],
+  'risk-scorer': ['axios'],
+  'sentiment-analyzer': ['axios'],
   'query-pool': ['axios'],
   'telegram-alert': ['axios'],
   'discord-alert': ['axios'],
@@ -230,8 +230,26 @@ runWorkflow().catch(console.error);
     if (packages.includes('viem')) {
       lines.push("import { createPublicClient, http } from 'viem';");
     }
-    if (packages.includes('@anthropic-ai/sdk')) {
-      lines.push("import Anthropic from '@anthropic-ai/sdk';");
+    // Bedrock LLM helper (generated when AI nodes are present)
+    if (nodes.some(n => ['llm-analyzer', 'risk-scorer', 'sentiment-analyzer'].includes(n.type))) {
+      lines.push('');
+      lines.push('// AWS Bedrock LLM helper');
+      lines.push('const bedrockRegion = process.env.AWS_BEDROCK_REGION || "us-east-1";');
+      lines.push('const bedrockToken = process.env.AWS_BEARER_TOKEN_BEDROCK!;');
+      lines.push('const bedrockHeaders = {');
+      lines.push('  "Content-Type": "application/json",');
+      lines.push('  Accept: "application/json",');
+      lines.push('  Authorization: `Bearer ${bedrockToken}`,');
+      lines.push('};');
+      lines.push('async function callBedrock(modelId: string, systemPrompt: string, userPrompt: string, maxTokens = 1024) {');
+      lines.push('  const url = `https://bedrock-runtime.${bedrockRegion}.amazonaws.com/model/${encodeURIComponent(modelId)}/converse`;');
+      lines.push('  const resp = await axios.post(url, {');
+      lines.push('    messages: [{ role: "user", content: [{ text: userPrompt }] }],');
+      lines.push('    system: [{ text: systemPrompt }],');
+      lines.push('    inferenceConfig: { maxTokens, temperature: 0.3 },');
+      lines.push('  }, { headers: bedrockHeaders });');
+      lines.push('  return resp.data.output?.message?.content?.[0]?.text || "";');
+      lines.push('}');
     }
     if (packages.includes('axios')) {
       lines.push("import axios from 'axios';");
@@ -574,39 +592,37 @@ const config = {
         lines.push(`  const ${varName}_result = await agentKit.queryVaultPosition("${config.vaultAddress || ''}");`);
         break;
 
-      // AI
+      // AI (AWS Bedrock via Converse API)
       case 'llm-analyzer':
         lines.push(`  // LLM Analyzer: ${label}`);
-        lines.push(`  const ${varName}_anthropic = new Anthropic();`);
-        lines.push(`  const ${varName}_result = await ${varName}_anthropic.messages.create({`);
-        lines.push(`    model: "${config.model || 'claude-sonnet-4-20250514'}",`);
-        lines.push(`    max_tokens: 1024,`);
-        lines.push(`    system: "${(config.systemPrompt || '').replace(/"/g, '\\"')}",`);
-        lines.push(`    messages: [{ role: "user", content: "${(config.userPrompt || '').replace(/"/g, '\\"')}" }],`);
-        lines.push(`  });`);
-        lines.push(`  console.log('LLM response:', ${varName}_result.content[0]);`);
+        lines.push(`  const ${varName}_result = await callBedrock(`);
+        lines.push(`    "${config.model || 'openai.gpt-oss-120b-1:0'}",`);
+        lines.push(`    "${(config.systemPrompt || 'You are a helpful AI assistant.').replace(/"/g, '\\"')}",`);
+        lines.push(`    "${(config.userPrompt || 'Analyze the provided data.').replace(/"/g, '\\"')}",`);
+        lines.push(`  );`);
+        lines.push(`  console.log('LLM response:', ${varName}_result);`);
         break;
 
       case 'risk-scorer':
         lines.push(`  // Risk Scorer: ${label}`);
-        lines.push(`  const ${varName}_anthropic = new Anthropic();`);
-        lines.push(`  const ${varName}_result = await ${varName}_anthropic.messages.create({`);
-        lines.push(`    model: "claude-sonnet-4-20250514",`);
-        lines.push(`    max_tokens: 1024,`);
-        lines.push(`    system: "You are a DeFi risk analyst. Evaluate the portfolio data and return a JSON object with: riskScore (0-100), analysis (string), recommendation (string).",`);
-        lines.push(`    messages: [{ role: "user", content: JSON.stringify({ factors: ${JSON.stringify(config.factors || [])} }) }],`);
-        lines.push(`  });`);
+        lines.push(`  const ${varName}_raw = await callBedrock(`);
+        lines.push(`    "${config.model || 'openai.gpt-oss-120b-1:0'}",`);
+        lines.push(`    "You are a DeFi risk analyst. Evaluate the portfolio data and return a JSON object with: riskScore (0-100), analysis (string), recommendation (string). Respond with valid JSON only.",`);
+        lines.push(`    JSON.stringify({ factors: ${JSON.stringify(config.factors || ['volatility', 'impermanent_loss', 'liquidity_depth', 'smart_contract_risk'])} }),`);
+        lines.push(`  );`);
+        lines.push(`  const ${varName}_result = JSON.parse(${varName}_raw);`);
+        lines.push(`  console.log('Risk score:', ${varName}_result.riskScore);`);
         break;
 
       case 'sentiment-analyzer':
         lines.push(`  // Sentiment Analyzer: ${label}`);
-        lines.push(`  const ${varName}_anthropic = new Anthropic();`);
-        lines.push(`  const ${varName}_result = await ${varName}_anthropic.messages.create({`);
-        lines.push(`    model: "claude-sonnet-4-20250514",`);
-        lines.push(`    max_tokens: 1024,`);
-        lines.push(`    system: "You are a market sentiment analyst. Analyze the data and return JSON with: sentimentScore (-100 to +100), summary (string), signals (array).",`);
-        lines.push(`    messages: [{ role: "user", content: "Analyze this data" }],`);
-        lines.push(`  });`);
+        lines.push(`  const ${varName}_raw = await callBedrock(`);
+        lines.push(`    "${config.model || 'openai.gpt-oss-120b-1:0'}",`);
+        lines.push(`    "You are a market sentiment analyst. Analyze the data and return JSON with: sentimentScore (-100 to +100), summary (string), signals (array). Respond with valid JSON only.",`);
+        lines.push(`    "Analyze this data",`);
+        lines.push(`  );`);
+        lines.push(`  const ${varName}_result = JSON.parse(${varName}_raw);`);
+        lines.push(`  console.log('Sentiment:', ${varName}_result.sentimentScore);`);
         break;
 
       // Logic

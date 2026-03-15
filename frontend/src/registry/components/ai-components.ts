@@ -1,6 +1,7 @@
 /**
  * AI / LLM Components
  * Components for AI-powered analysis, risk scoring, and sentiment detection
+ * All AI calls go through AWS Bedrock (GPT-OSS models)
  */
 
 import { ComponentSchema } from '@/types';
@@ -19,22 +20,16 @@ export const AI_COMPONENTS: Record<string, ComponentSchema> = {
       hasBottomHandle: true,
     },
     configSchema: {
-      provider: {
+      model: {
         type: 'select',
-        label: 'Provider',
-        defaultValue: 'claude',
+        label: 'Model',
+        defaultValue: 'openai.gpt-oss-120b-1:0',
         required: true,
         options: [
-          { value: 'claude', label: 'Claude (Anthropic)' },
-          { value: 'gpt4', label: 'GPT-4 (OpenAI)' },
-          { value: 'together', label: 'Together AI' },
+          { value: 'openai.gpt-oss-120b-1:0', label: 'GPT-OSS 120B (best quality)' },
+          { value: 'openai.gpt-oss-20b-1:0', label: 'GPT-OSS 20B (faster)' },
         ],
-      },
-      model: {
-        type: 'text',
-        label: 'Model',
-        placeholder: 'claude-sonnet-4-20250514',
-        required: true,
+        description: 'Runs on AWS Bedrock.',
       },
       systemPrompt: {
         type: 'textarea',
@@ -84,7 +79,7 @@ export const AI_COMPONENTS: Record<string, ComponentSchema> = {
       { id: 'decision', label: 'Decision', type: 'boolean' },
     ],
     codeTemplate: 'llm-analyzer.hbs',
-    requiredPackages: ['@anthropic-ai/sdk'],
+    requiredPackages: ['axios'],
   },
 
   'risk-scorer': {
@@ -100,15 +95,16 @@ export const AI_COMPONENTS: Record<string, ComponentSchema> = {
       hasBottomHandle: true,
     },
     configSchema: {
-      provider: {
+      model: {
         type: 'select',
-        label: 'Provider',
-        defaultValue: 'claude',
+        label: 'Model',
+        defaultValue: 'openai.gpt-oss-120b-1:0',
         required: true,
         options: [
-          { value: 'claude', label: 'Claude' },
-          { value: 'openai', label: 'OpenAI' },
+          { value: 'openai.gpt-oss-120b-1:0', label: 'GPT-OSS 120B (best quality)' },
+          { value: 'openai.gpt-oss-20b-1:0', label: 'GPT-OSS 20B (faster)' },
         ],
+        description: 'Runs on AWS Bedrock.',
       },
       riskThreshold: {
         type: 'number',
@@ -135,7 +131,7 @@ export const AI_COMPONENTS: Record<string, ComponentSchema> = {
       { id: 'recommendation', label: 'Recommendation', type: 'string' },
     ],
     codeTemplate: 'risk-scorer.hbs',
-    requiredPackages: ['@anthropic-ai/sdk'],
+    requiredPackages: ['axios'],
   },
 
   'sentiment-analyzer': {
@@ -151,15 +147,16 @@ export const AI_COMPONENTS: Record<string, ComponentSchema> = {
       hasBottomHandle: true,
     },
     configSchema: {
-      provider: {
+      model: {
         type: 'select',
-        label: 'Provider',
-        defaultValue: 'claude',
+        label: 'Model',
+        defaultValue: 'openai.gpt-oss-120b-1:0',
         required: true,
         options: [
-          { value: 'claude', label: 'Claude' },
-          { value: 'openai', label: 'OpenAI' },
+          { value: 'openai.gpt-oss-120b-1:0', label: 'GPT-OSS 120B (best quality)' },
+          { value: 'openai.gpt-oss-20b-1:0', label: 'GPT-OSS 20B (faster)' },
         ],
+        description: 'Runs on AWS Bedrock.',
       },
       sources: {
         type: 'multi-select',
@@ -190,6 +187,6 @@ export const AI_COMPONENTS: Record<string, ComponentSchema> = {
       { id: 'signals', label: 'Signals', type: 'json' },
     ],
     codeTemplate: 'sentiment-analyzer.hbs',
-    requiredPackages: ['@anthropic-ai/sdk'],
+    requiredPackages: ['axios'],
   },
 };

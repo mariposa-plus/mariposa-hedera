@@ -1,11 +1,11 @@
 /**
- * Copilot Service — Together AI (OpenAI-compatible API)
+ * Copilot Service — AWS Bedrock (via central LLM service)
  *
- * Sends chat messages (with canvas context) to Together AI and parses the
+ * Sends chat messages (with canvas context) to Bedrock and parses the
  * response into a conversational message + optional canvas actions.
  */
 
-import axios from 'axios';
+import { llmService, MODELS } from './llm';
 import { buildCopilotPrompt, CopilotAction } from './copilot.prompt';
 
 interface ChatMessage {
@@ -19,71 +19,37 @@ interface CopilotResponse {
 }
 
 class CopilotService {
-  private apiKey: string;
-  private model: string;
-  private baseUrl = 'https://api.together.xyz/v1/chat/completions';
-
-  constructor() {
-    this.apiKey = process.env.TOGETHER_API_KEY || '';
-    this.model =
-      process.env.TOGETHER_MODEL ||
-      'Qwen/Qwen3-235B-A22B-Instruct-2507-tput';
-  }
-
   /**
-   * Send a chat conversation to Together AI with the current canvas context.
+   * Send a chat conversation to Bedrock with the current canvas context.
    */
   async chat(
     messages: ChatMessage[],
     currentNodes: any[],
     currentEdges: any[],
   ): Promise<CopilotResponse> {
-    if (!this.apiKey) {
-      throw new Error(
-        'TOGETHER_API_KEY is not configured. Please set it in the backend .env file.',
-      );
-    }
-
     // Build system prompt with current canvas state
     const systemPrompt = buildCopilotPrompt(currentNodes, currentEdges);
 
-    // Construct the messages array: system + conversation history
-    const fullMessages: ChatMessage[] = [
-      { role: 'system', content: systemPrompt },
-      ...messages,
-    ];
+    // Only user/assistant messages go in the messages array for Converse API
+    const conversationMessages = messages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-    let response;
+    let result;
     try {
-      response = await axios.post(
-        this.baseUrl,
-        {
-          model: this.model,
-          messages: fullMessages,
-          max_tokens: 4096,
-          temperature: 0.7,
-          top_p: 0.9,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 60000,
-        },
-      );
+      result = await llmService.chat({
+        systemPrompt,
+        messages: conversationMessages,
+        model: MODELS.GPT_OSS_120B,
+        temperature: 0.7,
+        maxTokens: 4096,
+      });
     } catch (error: any) {
-      const detail = error.response?.data?.error?.message
-        || JSON.stringify(error.response?.data)
-        || error.message;
-      console.error('[Copilot] Together AI error:', detail);
-      throw new Error(`Together AI request failed: ${detail}`);
+      console.error('[Copilot] Bedrock error:', error.message);
+      throw new Error(`Bedrock request failed: ${error.message}`);
     }
 
-    const rawContent: string =
-      response.data?.choices?.[0]?.message?.content || '';
-
-    return this.parseResponse(rawContent);
+    return this.parseResponse(result.content);
   }
 
   /**
