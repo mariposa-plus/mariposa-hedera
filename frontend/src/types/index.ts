@@ -277,6 +277,37 @@ export interface HederaWorkflow {
   generatedAt?: string;
   status: 'pending' | 'generated' | 'valid' | 'invalid';
   validationErrors?: string[];
+  deployConfig?: {
+    hcs10Enabled: boolean;
+    mcpEnabled: boolean;
+    network: string;
+    agentName: string;
+  };
+  generatedFiles?: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+// HCS-10 / MCP Deploy Configuration
+
+export interface HCS10Config {
+  enabled: boolean;
+  agentName: string;
+  agentDescription: string;
+  agentType: 'manual' | 'autonomous';
+  autoAcceptConnections: boolean;
+  registerOnBroker: boolean;
+}
+
+export interface MCPConfig {
+  enabled: boolean;
+  transport: 'stdio' | 'sse';
+  port: number;
+  registerOnBroker: boolean;
+}
+
+export interface DeployConfig {
+  hcs10: HCS10Config;
+  mcp: MCPConfig;
+  network: HederaNetwork;
 }

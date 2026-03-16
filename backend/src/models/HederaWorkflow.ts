@@ -8,6 +8,13 @@ export interface IHederaWorkflow extends Document {
   generatedAt?: Date;
   status: 'pending' | 'generated' | 'valid' | 'invalid';
   validationErrors?: string[];
+  deployConfig?: {
+    hcs10Enabled: boolean;
+    mcpEnabled: boolean;
+    network: string;
+    agentName: string;
+  };
+  generatedFiles?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +28,13 @@ const hederaWorkflowSchema = new Schema<IHederaWorkflow>(
     generatedAt: { type: Date },
     status: { type: String, enum: ['pending', 'generated', 'valid', 'invalid'], default: 'pending' },
     validationErrors: [{ type: String }],
+    deployConfig: {
+      hcs10Enabled: { type: Boolean },
+      mcpEnabled: { type: Boolean },
+      network: { type: String },
+      agentName: { type: String },
+    },
+    generatedFiles: [{ type: String }],
   },
   { timestamps: true }
 );

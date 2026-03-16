@@ -27,7 +27,7 @@ import { GenericConfigForm } from '@/components/modals/config-forms/GenericConfi
 import { EdgeConditionModal } from '@/components/modals/EdgeConditionModal';
 import { TestExecutionModal } from '@/components/modals/TestExecutionModal';
 import { ConditionalEdge } from '@/components/edges/ConditionalEdge';
-import { Save, ArrowLeft, Play, Beaker, Code2, Sparkles } from 'lucide-react';
+import { Save, ArrowLeft, Play, Beaker, Code2, Sparkles, Rocket } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { NodeConfiguration, EdgeCondition, ComponentType } from '@/types';
 import { getComponentById } from '@/registry';
@@ -36,6 +36,7 @@ import { PipelineStatusBadge } from '@/components/pipeline/PipelineStatusBadge';
 import { PipelineActivateButton } from '@/components/pipeline/PipelineActivateButton';
 import { WorkflowCodePanel } from '@/components/panels/WorkflowCodePanel';
 import { CopilotPanel } from '@/components/panels/CopilotPanel';
+import { DeployPanel } from '@/components/panels/DeployPanel';
 import { useHederaStore } from '@/store/hederaStore';
 
 // Use the generic node types mapping (supports all Hedera components)
@@ -110,6 +111,9 @@ function PipelineBuilderContent() {
 
   // Copilot panel state
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+
+  // Deploy panel state
+  const [isDeployPanelOpen, setIsDeployPanelOpen] = useState(false);
 
   // Helper functions to get connected nodes
   const getUpstreamNodes = useCallback((node: Node): PipelineNode[] => {
@@ -804,7 +808,10 @@ function PipelineBuilderContent() {
 
             {/* AI Copilot */}
             <button
-              onClick={() => setIsCopilotOpen((v) => !v)}
+              onClick={() => {
+                setIsCopilotOpen((v) => !v);
+                setIsDeployPanelOpen(false);
+              }}
               style={{
                 padding: '8px 16px',
                 background: isCopilotOpen ? '#b45309' : '#f59e0b',
@@ -822,6 +829,32 @@ function PipelineBuilderContent() {
             >
               <Sparkles size={16} />
               {isCopilotOpen ? 'Close AI' : 'AI Copilot'}
+            </button>
+
+            {/* Deploy Agent */}
+            <button
+              onClick={() => {
+                setIsDeployPanelOpen((v) => !v);
+                setIsCopilotOpen(false);
+                setIsCodePanelOpen(false);
+              }}
+              style={{
+                padding: '8px 16px',
+                background: isDeployPanelOpen ? '#6b21a8' : '#a855f7',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '14px',
+                fontWeight: '600',
+              }}
+              title="Deploy as HCS-10 Agent"
+            >
+              <Rocket size={16} />
+              {isDeployPanelOpen ? 'Close' : 'Deploy'}
             </button>
 
             <div style={{ width: '1px', height: '32px', background: '#2a3f5f' }} />
@@ -945,6 +978,14 @@ function PipelineBuilderContent() {
         nodes={nodes}
         edges={edges}
         onApplyActions={applyCopilotActions}
+      />
+
+      {/* Deploy Agent Panel */}
+      <DeployPanel
+        isOpen={isDeployPanelOpen}
+        onClose={() => setIsDeployPanelOpen(false)}
+        pipelineId={pipelineId}
+        pipelineName={currentPipeline?.name || 'Pipeline'}
       />
     </div>
   );

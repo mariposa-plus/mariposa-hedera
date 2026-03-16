@@ -6,6 +6,11 @@ import HederaProject, { IHederaProject } from '../models/HederaProject';
 
 const execAsync = promisify(exec);
 
+interface DeployDeps {
+  hcs10?: boolean;
+  mcp?: boolean;
+}
+
 class HederaProjectManagerService {
   private baseDir: string;
 
@@ -20,7 +25,8 @@ class HederaProjectManagerService {
     userId: string,
     name: string,
     description?: string,
-    network: 'mainnet' | 'testnet' = 'testnet'
+    network: 'mainnet' | 'testnet' = 'testnet',
+    deployConfig?: DeployDeps,
   ): Promise<IHederaProject & { _id: any }> {
     const projectId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const projectDir = path.join(this.baseDir, userId, projectId);
@@ -28,22 +34,39 @@ class HederaProjectManagerService {
     fs.mkdirSync(projectDir, { recursive: true });
     fs.mkdirSync(path.join(projectDir, 'src'), { recursive: true });
 
-    // Write package.json
+    // Build dependencies
+    const dependencies: Record<string, string> = {
+      'hedera-agent-kit': '^3.0.0',
+      '@hashgraph/sdk': '^2.40.0',
+      'dotenv': '^16.3.1',
+      'typescript': '^5.3.3',
+      'ts-node': '^10.9.2',
+      'axios': '^1.6.0',
+    };
+
+    if (deployConfig?.hcs10) {
+      dependencies['@hashgraphonline/standards-sdk'] = 'latest';
+      dependencies['@hashgraphonline/standards-agent-kit'] = 'latest';
+    }
+    if (deployConfig?.mcp) {
+      dependencies['@modelcontextprotocol/sdk'] = 'latest';
+    }
+
+    // Build scripts
+    const scripts: Record<string, string> = {
+      start: 'ts-node src/index.ts',
+      build: 'tsc',
+    };
+    if (deployConfig?.hcs10) {
+      scripts['register-agent'] = 'ts-node src/hcs10/register.ts';
+    }
+
     const packageJson = {
       name: name.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       version: '1.0.0',
       private: true,
-      scripts: {
-        start: 'ts-node src/index.ts',
-        build: 'tsc',
-      },
-      dependencies: {
-        'hedera-agent-kit': '^3.0.0',
-        '@hashgraph/sdk': '^2.40.0',
-        'dotenv': '^16.3.1',
-        'typescript': '^5.3.3',
-        'ts-node': '^10.9.2',
-      },
+      scripts,
+      dependencies,
     };
 
     fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify(packageJson, null, 2));
@@ -68,17 +91,37 @@ class HederaProjectManagerService {
     fs.writeFileSync(path.join(projectDir, 'tsconfig.json'), JSON.stringify(tsconfig, null, 2));
 
     // Write .env template
-    const envContent = `# Hedera Configuration
+    let envContent = `# Hedera Configuration
 HEDERA_OPERATOR_ID=0.0.XXXXX
 HEDERA_OPERATOR_KEY=302e020100300506032b657004220420...
 HEDERA_NETWORK=${network}
 
-# LLM API Keys (if using AI nodes)
-ANTHROPIC_API_KEY=
+# AWS Bedrock (for AI nodes)
+AWS_BEDROCK_REGION=us-east-1
+AWS_BEARER_TOKEN_BEDROCK=
+BEDROCK_MODEL_ID=openai.gpt-oss-120b-1:0
 
 # Notification Keys (if using output nodes)
 TELEGRAM_BOT_TOKEN=
 `;
+
+    if (deployConfig?.hcs10) {
+      envContent += `
+# HCS-10 Agent (populated after: npm run register-agent)
+AGENT_ACCOUNT_ID=
+AGENT_PRIVATE_KEY=
+AGENT_INBOUND_TOPIC=
+AGENT_OUTBOUND_TOPIC=
+`;
+    }
+
+    if (deployConfig?.mcp) {
+      envContent += `
+# MCP Server
+MCP_TRANSPORT=stdio
+MCP_PORT=3001
+`;
+    }
 
     fs.writeFileSync(path.join(projectDir, '.env'), envContent);
 
@@ -105,6 +148,20 @@ TELEGRAM_BOT_TOKEN=
     }
 
     fs.writeFileSync(path.join(srcDir, 'index.ts'), code);
+  }
+
+  async writeMultipleFiles(
+    projectDir: string,
+    files: { relativePath: string; content: string }[],
+  ): Promise<void> {
+    for (const file of files) {
+      const fullPath = path.join(projectDir, file.relativePath);
+      const dir = path.dirname(fullPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(fullPath, file.content);
+    }
   }
 
   async initProject(projectDir: string): Promise<{ stdout: string; stderr: string }> {

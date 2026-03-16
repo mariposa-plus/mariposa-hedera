@@ -8,6 +8,7 @@ import {
   initProject,
   updateProjectConfig,
   generateWorkflow,
+  generateWithDeploy,
   getWorkflowCode,
 } from '../controllers/hederaController';
 
@@ -23,6 +24,7 @@ router.delete('/projects/:id', deleteProject);
 router.post('/projects/:id/init', initProject);
 router.put('/projects/:id/config', updateProjectConfig);
 router.post('/workflows/generate', generateWorkflow);
+router.post('/workflows/generate-deploy', generateWithDeploy);
 router.get('/workflows/:id/code', getWorkflowCode);
 
 export default router;
