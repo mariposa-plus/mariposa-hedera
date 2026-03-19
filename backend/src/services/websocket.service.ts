@@ -85,6 +85,30 @@ class WebSocketService {
   }
 
   /**
+   * Emit a deploy log line to deployment room
+   */
+  emitDeployLog(deploymentId: string, log: { line: string; stream: 'stdout' | 'stderr'; timestamp: string }): void {
+    if (!this.io) return;
+    this.io.to(`deploy:${deploymentId}`).emit('deploy:log', log);
+  }
+
+  /**
+   * Emit deploy step status update
+   */
+  emitDeployStep(deploymentId: string, step: { name: string; status: string; exitCode?: number }): void {
+    if (!this.io) return;
+    this.io.to(`deploy:${deploymentId}`).emit('deploy:step', step);
+  }
+
+  /**
+   * Emit overall deploy status change
+   */
+  emitDeployStatus(deploymentId: string, data: { status: string; error?: string }): void {
+    if (!this.io) return;
+    this.io.to(`deploy:${deploymentId}`).emit('deploy:status', data);
+  }
+
+  /**
    * Get the Socket.io server instance
    */
   getIO(): SocketIOServer | null {

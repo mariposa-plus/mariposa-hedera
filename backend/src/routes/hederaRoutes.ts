@@ -10,6 +10,9 @@ import {
   generateWorkflow,
   generateWithDeploy,
   getWorkflowCode,
+  startDeployRun,
+  stopDeployRun,
+  getDeployment,
 } from '../controllers/hederaController';
 
 const router = express.Router();
@@ -25,6 +28,9 @@ router.post('/projects/:id/init', initProject);
 router.put('/projects/:id/config', updateProjectConfig);
 router.post('/workflows/generate', generateWorkflow);
 router.post('/workflows/generate-deploy', generateWithDeploy);
+router.post('/workflows/deploy-run', startDeployRun);
 router.get('/workflows/:id/code', getWorkflowCode);
+router.post('/deployments/:id/stop', stopDeployRun);
+router.get('/deployments/:id', getDeployment);
 
 export default router;

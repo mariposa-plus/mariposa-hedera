@@ -1,10 +1,11 @@
-import { exec } from 'child_process';
 import { Request, Response } from 'express';
 import { hederaProjectManager } from '../services/hederaProjectManager.service';
 import { hederaCodeGenerator } from '../services/hederaCodeGenerator.service';
 import { hcs10CodeGenerator } from '../services/hcs10CodeGenerator.service';
+import { deployRunner } from '../services/deployRunner.service';
 import HederaProject from '../models/HederaProject';
 import HederaWorkflow from '../models/HederaWorkflow';
+import Deployment from '../models/Deployment';
 import Pipeline from '../models/Pipeline';
 
 // --- Projects ---
@@ -264,6 +265,112 @@ export const getWorkflowCode = async (req: Request, res: Response) => {
       status: workflow.status,
       generatedAt: workflow.generatedAt,
     });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// --- Deploy Runner ---
+
+export const startDeployRun = async (req: Request, res: Response) => {
+  try {
+    const { pipelineId } = req.body;
+    if (!pipelineId) {
+      return res.status(400).json({ success: false, message: 'pipelineId is required' });
+    }
+
+    const pipeline = await Pipeline.findById(pipelineId);
+    if (!pipeline) {
+      return res.status(404).json({ success: false, message: 'Pipeline not found' });
+    }
+
+    // Find project and workflow
+    const project = pipeline.hederaProjectId
+      ? await HederaProject.findById(pipeline.hederaProjectId)
+      : null;
+    if (!project) {
+      return res.status(400).json({ success: false, message: 'No generated project found. Generate first.' });
+    }
+
+    const workflow = await HederaWorkflow.findOne({
+      pipelineId,
+      projectId: project._id,
+    });
+    if (!workflow || !workflow.generatedFiles?.length) {
+      return res.status(400).json({ success: false, message: 'No generated files found. Generate first.' });
+    }
+
+    const hcs10Enabled = !!workflow.deployConfig?.hcs10Enabled;
+    const mcpEnabled = !!workflow.deployConfig?.mcpEnabled;
+
+    // Build steps list
+    const steps: Array<{ name: 'install' | 'register-agent' | 'start'; status: 'pending'; command: string }> = [
+      { name: 'install', status: 'pending', command: 'npm install' },
+    ];
+    if (hcs10Enabled) {
+      steps.push({ name: 'register-agent', status: 'pending', command: 'npm run register-agent' });
+    }
+    steps.push({ name: 'start', status: 'pending', command: 'npm start' });
+
+    // Create deployment record
+    const deployment = await Deployment.create({
+      projectId: project._id,
+      workflowId: workflow._id,
+      pipelineId,
+      userId: (req as any).user.id,
+      status: 'pending',
+      steps,
+      projectDir: project.workspacePath,
+      hcs10Enabled,
+      mcpEnabled,
+    });
+
+    // Return immediately, run async
+    res.status(202).json({
+      success: true,
+      deploymentId: deployment._id,
+    });
+
+    // Fire and forget
+    deployRunner.startDeployment(
+      deployment._id.toString(),
+      project.workspacePath,
+      hcs10Enabled,
+    ).catch((err) => {
+      console.error('Deploy runner error:', err.message);
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const stopDeployRun = async (req: Request, res: Response) => {
+  try {
+    const deployment = await Deployment.findOne({
+      _id: req.params.id,
+      userId: (req as any).user.id,
+    });
+    if (!deployment) {
+      return res.status(404).json({ success: false, message: 'Deployment not found' });
+    }
+
+    await deployRunner.stopDeployment(deployment._id.toString());
+    res.json({ success: true, message: 'Deployment stopped' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getDeployment = async (req: Request, res: Response) => {
+  try {
+    const deployment = await Deployment.findOne({
+      _id: req.params.id,
+      userId: (req as any).user.id,
+    });
+    if (!deployment) {
+      return res.status(404).json({ success: false, message: 'Deployment not found' });
+    }
+    res.json({ success: true, deployment });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

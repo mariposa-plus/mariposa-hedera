@@ -44,6 +44,12 @@ interface HederaState {
   deployResult: { generatedFiles: string[]; projectPath: string } | null;
   generateWithDeploy: (pipelineId: string) => Promise<void>;
   resetDeploy: () => void;
+
+  // Deploy runner (Cloud CLI)
+  activeDeploymentId: string | null;
+  startDeployRun: (pipelineId: string) => Promise<string>;
+  stopDeployRun: (deploymentId: string) => Promise<void>;
+  resetDeployRun: () => void;
 }
 
 export const useHederaStore = create<HederaState>((set, get) => ({
@@ -130,5 +136,33 @@ export const useHederaStore = create<HederaState>((set, get) => ({
       deployResult: null,
       deployConfig: { ...defaultDeployConfig },
     });
+  },
+
+  // Deploy runner
+  activeDeploymentId: null,
+
+  startDeployRun: async (pipelineId: string) => {
+    set({ error: null });
+    try {
+      const response = await api.post('/hedera/workflows/deploy-run', { pipelineId });
+      const deploymentId = response.data.deploymentId;
+      set({ activeDeploymentId: deploymentId });
+      return deploymentId;
+    } catch (error: any) {
+      set({ error: error.response?.data?.message || error.message });
+      throw error;
+    }
+  },
+
+  stopDeployRun: async (deploymentId: string) => {
+    try {
+      await api.post(`/hedera/deployments/${deploymentId}/stop`);
+    } catch (error: any) {
+      set({ error: error.response?.data?.message || error.message });
+    }
+  },
+
+  resetDeployRun: () => {
+    set({ activeDeploymentId: null });
   },
 }));
