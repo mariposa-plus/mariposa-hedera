@@ -50,7 +50,7 @@ export function useDeploySocket(deploymentId: string | null) {
     setStatus('pending');
 
     const socket = io(getWsUrl(), {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
     });
     socketRef.current = socket;
 

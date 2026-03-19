@@ -141,6 +141,30 @@ MCP_PORT=3001
     return project;
   }
 
+  /**
+   * Update an existing project's package.json with deploy dependencies and scripts
+   */
+  updatePackageJsonForDeploy(projectDir: string, deployConfig: DeployDeps): void {
+    const pkgPath = path.join(projectDir, 'package.json');
+    if (!fs.existsSync(pkgPath)) return;
+
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+
+    if (!pkg.dependencies) pkg.dependencies = {};
+    if (!pkg.scripts) pkg.scripts = {};
+
+    if (deployConfig.hcs10) {
+      pkg.dependencies['@hashgraphonline/standards-sdk'] = 'latest';
+      pkg.dependencies['@hashgraphonline/standards-agent-kit'] = 'latest';
+      pkg.scripts['register-agent'] = 'ts-node src/hcs10/register.ts';
+    }
+    if (deployConfig.mcp) {
+      pkg.dependencies['@modelcontextprotocol/sdk'] = 'latest';
+    }
+
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+  }
+
   async writeWorkflowFiles(projectDir: string, code: string): Promise<void> {
     const srcDir = path.join(projectDir, 'src');
     if (!fs.existsSync(srcDir)) {

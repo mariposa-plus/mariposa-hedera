@@ -203,6 +203,12 @@ export const generateWithDeploy = async (req: Request, res: Response) => {
       );
       pipeline.hederaProjectId = project._id;
       await pipeline.save();
+    } else {
+      // Project exists — update package.json with deploy deps/scripts
+      hederaProjectManager.updatePackageJsonForDeploy(project.workspacePath, {
+        hcs10: deployConfig.hcs10?.enabled,
+        mcp: deployConfig.mcp?.enabled,
+      });
     }
 
     // Generate all project files
